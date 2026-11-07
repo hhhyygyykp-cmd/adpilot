@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #0c0b09;
+  --ink-soft: #14120f;
+  --surface: #1b1814;
+  --surface-2: #221e19;
+  --line: rgba(212, 180, 131, 0.16);
+  --gold: #d4b483;
+  --gold-deep: #b8956a;
+  --cream: #f4efe6;
+  --muted: #9c9386;
+  --danger: #e07a5f;
+  --ok: #8fad7a;
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  --font-sans: var(--font-manrope), var(--font-ibm-arabic), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-instrument), var(--font-naskh), ui-serif, Georgia, serif;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-cream: var(--cream);
+  --color-gold: var(--gold);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+}
+
+html,
+body {
+  background: var(--ink);
+  color: var(--cream);
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-image:
+    radial-gradient(1200px 600px at 10% -10%, rgba(212, 180, 131, 0.08), transparent 55%),
+    radial-gradient(900px 500px at 110% 0%, rgba(184, 149, 106, 0.06), transparent 50%);
+}
+
+html[dir="rtl"] .ltr-only {
+  display: none;
+}
+
+html[dir="ltr"] .rtl-only {
+  display: none;
+}
+
+.serif {
+  font-family: var(--font-serif);
+}
+
+.grain {
+  position: relative;
+}
+
+.grain::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+}
+
+.panel {
+  background: linear-gradient(180deg, rgba(34, 30, 25, 0.92), rgba(20, 18, 15, 0.92));
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.gold-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(212, 180, 131, 0.3);
+}
