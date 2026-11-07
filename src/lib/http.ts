@@ -41,30 +41,53 @@ export async function readJson<T>(request: Request): Promise<T | null> {
   }
 }
 
-function canonicalOrigin(value: string): string {
-  const url = new URL(value);
-  if (url.hostname === "localhost") url.hostname = "127.0.0.1";
-  return url.origin;
+function hostnameOf(value: string): string | null {
+  try {
+    const url = value.includes("://") ? new URL(value) : new URL(`https://${value}`);
+    const host = url.hostname.toLowerCase();
+    return host === "localhost" ? "127.0.0.1" : host;
+  } catch {
+    return null;
+  }
+}
+
+function requestHostnames(request: Request): Set<string> {
+  const hosts = new Set<string>();
+  const add = (value: string | null | undefined) => {
+    if (!value) return;
+    for (const part of value.split(",")) {
+      const host = hostnameOf(part.trim());
+      if (host) hosts.add(host);
+    }
+  };
+  add(request.url);
+  add(request.headers.get("host"));
+  add(request.headers.get("x-forwarded-host"));
+  add(request.headers.get("x-original-host"));
+  const forwarded = request.headers.get("forwarded");
+  if (forwarded) {
+    for (const match of forwarded.matchAll(/(?:^|[;,]\s*)host="?([^";,\s]+)"?/gi)) {
+      add(match[1]);
+    }
+  }
+  return hosts;
 }
 
 export function sameOrigin(request: Request): boolean {
+  const method = request.method.toUpperCase();
+  const site = (request.headers.get("sec-fetch-site") ?? "").toLowerCase();
+  // Browser fetch from the hosted page is same-origin even when the platform
+  // rewrites Host / request.url to an internal address behind TLS.
+  if (site === "same-origin") return true;
+  if (site === "cross-site") return false;
+
   const origin = request.headers.get("origin");
-  if (!origin) {
-    const method = request.method.toUpperCase();
+  if (!origin || origin === "null") {
     return method === "GET" || method === "HEAD";
   }
-  try {
-    const incoming = canonicalOrigin(origin);
-    if (incoming === canonicalOrigin(request.url)) return true;
-    const host = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() || request.headers.get("host");
-    const proto =
-      request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
-      new URL(request.url).protocol.replace(":", "");
-    if (!host) return false;
-    return incoming === canonicalOrigin(`${proto}://${host}`);
-  } catch {
-    return false;
-  }
+  const originHost = hostnameOf(origin);
+  if (!originHost) return false;
+  return requestHostnames(request).has(originHost);
 }
 
 export async function setLangCookie(request: Request, language: Language) {
