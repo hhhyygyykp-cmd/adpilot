@@ -1,6 +1,6 @@
 import { findValidInvite, redeemInvite } from "@/lib/admin";
 import { audit } from "@/lib/audit";
-import { createCustomer, createSession, findCustomerByEmail, validEmail, validPassword } from "@/lib/auth";
+import { createCustomer, createSession, findCustomerByEmail, isIosClient, validEmail, validPassword } from "@/lib/auth";
 import { sha256 } from "@/lib/crypto";
 import { errorJson, json, readJson, sameOrigin, setLangCookie } from "@/lib/http";
 import { isLanguage } from "@/lib/i18n";
@@ -9,7 +9,7 @@ import { clientKey, rateLimit } from "@/lib/rate-limit";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!sameOrigin(request)) return errorJson("Forbidden origin", 403);
+  if (!sameOrigin(request) && !isIosClient(request)) return errorJson("Forbidden origin", 403);
   const limited = rateLimit(clientKey(request, "register"), 8, 15 * 60 * 1000);
   if (!limited.ok) {
     return errorJson("Too many attempts. Try again shortly.", 429);
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
   const customer = await createCustomer({ email, password, name, language });
   if (inviteId) await redeemInvite(inviteId);
-  await createSession(request, customer.id);
+  const session = await createSession(request, customer.id);
   await setLangCookie(request, language);
   await audit({
     actorCustomerId: customer.id,
@@ -49,5 +49,11 @@ export async function POST(request: Request) {
     entityId: customer.id,
     metadata: { invited: Boolean(inviteId) },
   });
-  return json({ customer }, 201);
+  return json(
+    {
+      customer,
+      ...(isIosClient(request) ? { token: session.token } : {}),
+    },
+    201,
+  );
 }

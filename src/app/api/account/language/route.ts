@@ -1,4 +1,4 @@
-import { readSession } from "@/lib/auth";
+import { isIosClient, readSession } from "@/lib/auth";
 import { safeEqual } from "@/lib/crypto";
 import { sql } from "@/lib/db";
 import { errorJson, json, readJson, sameOrigin, setLangCookie } from "@/lib/http";
@@ -7,11 +7,12 @@ import { isLanguage } from "@/lib/i18n";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!sameOrigin(request)) return errorJson("Forbidden origin", 403);
+  const ios = isIosClient(request);
+  if (!ios && !sameOrigin(request)) return errorJson("Forbidden origin", 403);
   const body = await readJson<{ language?: string }>(request);
   if (!isLanguage(body?.language)) return errorJson("Unsupported language");
-  const auth = await readSession();
-  if (auth) {
+  const auth = await readSession(request);
+  if (auth && !ios) {
     const header = request.headers.get("x-csrf-token") ?? "";
     if (!header || !safeEqual(header, auth.session.csrf_token)) {
       return errorJson("Invalid security token", 403);

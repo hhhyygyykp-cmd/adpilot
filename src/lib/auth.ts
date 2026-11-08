@@ -76,6 +76,16 @@ export async function authenticate(email: string, password: string) {
   return mapCustomer(row);
 }
 
+export function isIosClient(request: Request): boolean {
+  return request.headers.get("x-adpilot-client") === "ios";
+}
+
+export function bearerToken(request: Request): string | null {
+  const header = request.headers.get("authorization") ?? "";
+  const match = /^Bearer\s+([A-Za-z0-9_-]{20,})$/.exec(header.trim());
+  return match?.[1] ?? null;
+}
+
 export async function createSession(request: Request, customerId: string) {
   const token = randomToken(32);
   const csrf = randomToken(24);
@@ -93,7 +103,7 @@ export async function createSession(request: Request, customerId: string) {
 
 export async function destroySession(request: Request) {
   const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
+  const token = bearerToken(request) ?? store.get(SESSION_COOKIE)?.value;
   if (token) {
     await sql(`delete from sessions where token_hash = $1`, [sha256(token)]);
   }
@@ -101,13 +111,10 @@ export async function destroySession(request: Request) {
   store.set(CSRF_COOKIE, "", { ...cookieOptions(request, false), maxAge: 0 });
 }
 
-export async function readSession(): Promise<{
+async function readSessionByToken(token: string): Promise<{
   session: SessionRow;
   customer: Customer;
 } | null> {
-  const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
   const rows = await sql<SessionRow & CustomerRow>(
     `select s.id, s.customer_id, s.csrf_token, s.expires_at,
             c.email, c.name, c.preferred_language, c.created_at
@@ -140,7 +147,26 @@ export async function readSession(): Promise<{
   };
 }
 
+export async function readSession(request?: Request): Promise<{
+  session: SessionRow;
+  customer: Customer;
+} | null> {
+  if (request) {
+    const token = bearerToken(request);
+    if (token) return readSessionByToken(token);
+  }
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  return readSessionByToken(token);
+}
+
 export async function requireCustomer(request: Request) {
+  if (bearerToken(request)) {
+    const auth = await readSession(request);
+    if (!auth) return { error: errorJson("Please sign in", 401) as Response };
+    return { customer: auth.customer, session: auth.session };
+  }
   if (request.method !== "GET" && request.method !== "HEAD") {
     if (!sameOrigin(request)) {
       return { error: errorJson("Forbidden origin", 403) as Response };

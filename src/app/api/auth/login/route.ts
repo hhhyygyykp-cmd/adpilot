@@ -1,4 +1,4 @@
-import { authenticate, createSession } from "@/lib/auth";
+import { authenticate, createSession, isIosClient } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { errorJson, json, readJson, sameOrigin, setLangCookie } from "@/lib/http";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
@@ -6,14 +6,14 @@ import { clientKey, rateLimit } from "@/lib/rate-limit";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!sameOrigin(request)) return errorJson("Forbidden origin", 403);
+  if (!sameOrigin(request) && !isIosClient(request)) return errorJson("Forbidden origin", 403);
   const body = await readJson<{ email?: string; password?: string }>(request);
   const email = (body?.email ?? "").trim().toLowerCase();
   const limited = rateLimit(clientKey(request, `login:${email}`), 8, 15 * 60 * 1000);
   if (!limited.ok) return errorJson("Too many attempts. Try again shortly.", 429);
   const customer = await authenticate(email, body?.password ?? "");
   if (!customer) return errorJson("Email or password is incorrect", 401);
-  await createSession(request, customer.id);
+  const session = await createSession(request, customer.id);
   await setLangCookie(request, customer.preferredLanguage);
   await audit({
     actorCustomerId: customer.id,
@@ -21,5 +21,8 @@ export async function POST(request: Request) {
     entityType: "customer",
     entityId: customer.id,
   });
-  return json({ customer });
+  return json({
+    customer,
+    ...(isIosClient(request) ? { token: session.token } : {}),
+  });
 }
