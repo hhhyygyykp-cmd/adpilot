@@ -315,14 +315,16 @@ function directionFor(
         ? "Use the uploaded product photographs; keep the named bottle in frame."
         : "Use the uploaded product photographs; do not replace the food."
       : "No product photographs are on file; any later visual must still show the named product.";
-  const price = offer ? `If type is added later, the price must read exactly ${offer}.` : "No verified price to typeset.";
+  const price = offer
+    ? `The verified price is ${offer}. Keep it in the caption, not painted into the photograph.`
+    : "No verified price is on file.";
   const extra =
     category === "fragrance"
       ? `Hierarchy: the ${product} bottle first. Do not invent scent notes.`
       : frameworkId === "product_demo"
         ? "Prefer close, honest product shots over generic lifestyle."
         : frameworkId === "offer_positioning"
-          ? "The offer should be readable in the first glance, never paraphrased."
-          : "Hierarchy: product first, then any verified offer, then a short CTA.";
+          ? "Show the product so the value is obvious. Do not paint the price into the picture."
+          : "Hierarchy: the product photograph first. Any verified offer stays in the caption.";
   return `${extra} ${photos} ${logo} ${price}`;
 }

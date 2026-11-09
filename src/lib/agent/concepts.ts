@@ -105,8 +105,8 @@ export function proposeConcepts(input: {
       ? `The viewer knows exactly what they get and what it costs: ${offer}.`
       : `The viewer gets a clear reason to choose ${product} without a made-up price.`,
     creativeDirection: offer
-      ? `Product first, then the exact text ${offer} — never paraphrased.`
-      : `Show ${product} clearly. Leave space for a price only if the customer later provides one.`,
+      ? `Photograph ${product} so it is unmistakable. Keep ${offer} in the caption, not painted into the picture.`
+      : `Photograph ${product} clearly. Do not invent a price or paint words into the picture.`,
     recommendedFormat: formatFor("offer", pref),
     cta: offer ? `Get ${product} — ${offer}` : `Choose ${product}`,
   };
@@ -135,7 +135,7 @@ export function proposeConcepts(input: {
             ? `${brand} as the place you sit — ${product} in a shared moment, not a flyer.`
             : `${product} in a shared moment, not a flyer.`,
           audienceBenefit: `${audience} should feel a place they want to be, with ${product} still in frame.`,
-          creativeDirection: `Hands, table, people around the named ${product}. No fake quotes.`,
+          creativeDirection: `One person actually using ${product}. No boardroom, no group meeting, no painted words.`,
           recommendedFormat: formatFor("lifestyle", pref),
           cta: `Make ${product} part of the day`,
         };

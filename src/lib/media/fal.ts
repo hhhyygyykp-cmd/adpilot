@@ -30,7 +30,7 @@ export async function falGenerateStill(prompt: string, customerId?: string): Pro
   const text = prompt.slice(0, 1200);
   const input = {
     prompt: text,
-    image_size: "square" as const,
+    image_size: "square_hd" as const,
     num_images: 1,
     num_inference_steps: 4,
     output_format: "jpeg" as const,
@@ -43,7 +43,7 @@ export async function falGenerateStill(prompt: string, customerId?: string): Pro
         modelId: FAL_IMAGE_MODEL,
         prompt: text,
         settings: input,
-        costUsd: imageCost("square", 1),
+        costUsd: imageCost("square_hd", 1),
       }))?.id
     : undefined;
   if (customerId && !jobId) throw new Error("Testing budget reached");
