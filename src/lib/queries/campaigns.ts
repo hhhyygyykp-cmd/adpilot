@@ -16,7 +16,7 @@ import {
   nextMissing,
   summaryPrompt,
 } from "../conversation/engine";
-import { listCreatives } from "./creatives";
+import { importMissingFalVideo, listCreatives } from "./creatives";
 import { redactFalMessage } from "../media/fal-key";
 import { buildMediaQuote, falKeyConfigured } from "../media/quote";
 import { emptyFacts } from "../conversation/extract";
@@ -298,6 +298,7 @@ export async function getCampaign(customerId: string, id: string) {
   if (!rows[0]) return null;
   const campaign = mapCampaign(rows[0]);
   campaign.creatives = await listCreatives(customerId, id);
+  if (await importMissingFalVideo(campaign)) return getCampaign(customerId, id);
   return campaign;
 }
 

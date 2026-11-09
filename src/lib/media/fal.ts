@@ -52,7 +52,7 @@ export async function falGenerateStill(prompt: string, customerId?: string): Pro
     const urls = mediaUrls(result.data);
     if (jobId) await attachFalRequest(jobId, result.requestId);
     if (!urls[0]) throw new Error("fal still did not return an image");
-    const buffer = await download(urls[0]);
+    const buffer = await downloadFalFile(urls[0]);
     const mime = sniff(buffer) ?? "image/jpeg";
     if (!mime.startsWith("image/")) throw new Error("fal still was not an image");
     if (jobId) await finishFalJob(jobId, "completed", urls, null);
@@ -85,22 +85,51 @@ export async function falGenerateVideo(prompt: string, customerId?: string): Pro
     : undefined;
   if (customerId && !jobId) throw new Error("Testing budget reached");
   try {
-    const result = await fal.subscribe(FAL_VIDEO_MODEL, { input, logs: false });
-    const urls = mediaUrls(result.data);
-    if (jobId) await attachFalRequest(jobId, result.requestId);
-    if (!urls[0]) throw new Error("fal video did not return a file");
-    const buffer = await download(urls[0]);
-    if (sniff(buffer) !== "video/mp4") throw new Error("fal did not return an mp4");
-    if (jobId) await finishFalJob(jobId, "completed", urls, null);
-    return { buffer, mimeType: "video/mp4", provider: "fal", kind: "video" };
+    const result = await fal.subscribe(FAL_VIDEO_MODEL, {
+      input,
+      logs: false,
+      mode: "polling",
+      onEnqueue: (requestId) => {
+        if (jobId && requestId) void attachFalRequest(jobId, requestId);
+      },
+    });
+    return await storedVideo(jobId, result.requestId, result.data);
   } catch (error) {
+    const recovered = await videoFromRequest(jobId, requestIdOf(error));
+    if (recovered) return recovered;
     const message = publicFalError(error);
     if (jobId) await finishFalJob(jobId, "failed", [], message);
     throw new Error(message);
   }
 }
 
-async function download(url: string): Promise<Buffer> {
+async function storedVideo(jobId: string | undefined, requestId: string | undefined, data: unknown): Promise<GeneratedMedia> {
+  const urls = mediaUrls(data);
+  if (jobId && requestId) await attachFalRequest(jobId, requestId);
+  if (!urls[0]) throw new Error("fal video did not return a file");
+  const buffer = await downloadFalFile(urls[0]);
+  if (sniff(buffer) !== "video/mp4") throw new Error("fal did not return an mp4");
+  if (jobId) await finishFalJob(jobId, "completed", urls, null);
+  return { buffer, mimeType: "video/mp4", provider: "fal", kind: "video" };
+}
+
+async function videoFromRequest(jobId: string | undefined, requestId: string): Promise<GeneratedMedia | null> {
+  if (!requestId) return null;
+  try {
+    if (jobId) await attachFalRequest(jobId, requestId);
+    const result = await fal.queue.result(FAL_VIDEO_MODEL, { requestId });
+    return await storedVideo(jobId, requestId, result.data);
+  } catch {
+    return null;
+  }
+}
+
+function requestIdOf(error: unknown): string {
+  if (!error || typeof error !== "object" || !("requestId" in error)) return "";
+  return typeof error.requestId === "string" ? error.requestId : "";
+}
+
+export async function downloadFalFile(url: string): Promise<Buffer> {
   if (!isPublicMediaUrl(url)) throw new Error("fal media download failed");
   const response = await fetch(url, { signal: AbortSignal.timeout(90_000) });
   if (!response.ok) throw new Error("fal media download failed");

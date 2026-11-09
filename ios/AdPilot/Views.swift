@@ -273,6 +273,12 @@ struct CreateAdView: View {
                                 }
                             }
                         }
+                        ForEach(campaign.creatives.filter { $0.kind == "video" }) { creative in
+                            CreativeVideo(id: creative.id)
+                            Text(creative.note)
+                                .font(AppFont.caption)
+                                .foregroundStyle(AppColor.mutedForeground)
+                        }
                         if campaign.status == "confirmed", let quote = campaign.mediaQuote {
                             let chargesVideo = quote.chargesVideo ?? (quote.video != nil)
                             let chargesStill = quote.chargesStill ?? (quote.video == nil)
@@ -336,12 +342,6 @@ struct CreateAdView: View {
                         }
                         if !campaign.generationNote.isEmpty {
                             Text(campaign.generationNote)
-                                .font(AppFont.caption)
-                                .foregroundStyle(AppColor.mutedForeground)
-                        }
-                        ForEach(campaign.creatives.filter { $0.kind == "video" }) { creative in
-                            CreativeVideo(id: creative.id)
-                            Text(creative.note)
                                 .font(AppFont.caption)
                                 .foregroundStyle(AppColor.mutedForeground)
                         }

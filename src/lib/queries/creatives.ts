@@ -2,8 +2,10 @@ import "server-only";
 
 import { newId } from "../crypto";
 import { parseJson, sql } from "../db";
-import { falGenerateStill, falGenerateVideo } from "../media/fal";
+import { downloadFalFile, falGenerateStill, falGenerateVideo } from "../media/fal";
+import { findCompletedFalVideos } from "../media/fal-recover";
 import { publicFalError } from "../media/fal-key";
+import { sniff } from "../media/sniff";
 import { localPreviewStill } from "../media/local-still";
 import { buildImagePrompt, buildVideoPrompt } from "../media/prompt";
 import type { GeneratedMedia } from "../media/provider";
@@ -15,6 +17,7 @@ import {
   formatUsd,
 } from "../media/quote";
 import { saveGenerated } from "../storage";
+import { getBusiness } from "./businesses";
 import type { Business, Campaign, CampaignCreative, GenerationStatus } from "../types";
 
 type Row = {
@@ -43,6 +46,46 @@ function mapCreative(row: Row): CampaignCreative {
     note: row.note,
     createdAt: new Date(row.created_at).toISOString(),
   };
+}
+
+export async function importMissingFalVideo(campaign: Campaign): Promise<boolean> {
+  if (campaign.creatives.some((item) => item.kind === "video")) return false;
+  if (!campaignWantsVideo(campaign)) return false;
+  const business = await getBusiness(campaign.customerId, campaign.businessId);
+  if (!business) return false;
+  const candidates = await findCompletedFalVideos(campaign.customerId, buildVideoPrompt(campaign, business));
+  for (const candidate of candidates) {
+    const taken = await sql<{ id: string }>(
+      `select id from campaign_creatives where customer_id = $1 and note like $2 limit 1`,
+      [campaign.customerId, `%${candidate.requestId}%`],
+    );
+    if (taken.length) continue;
+    try {
+      const buffer = await downloadFalFile(candidate.url);
+      if (sniff(buffer) !== "video/mp4") continue;
+      await storeCreative({
+        campaign,
+        media: { buffer, mimeType: "video/mp4", provider: "fal", kind: "video" },
+        prompt: buildVideoPrompt(campaign, business),
+        filename: `${campaign.productName || "ad"}.mp4`,
+        note: `Paid Kling 2.5 Turbo Pro video from fal, 5s. It had already finished and is now in AdPilot. ${candidate.requestId}`,
+      });
+      await sql(
+        `update campaigns set paid_video_count = paid_video_count + 1, updated_at = now()
+         where id = $1 and customer_id = $2`,
+        [campaign.id, campaign.customerId],
+      );
+      await finish(
+        campaign,
+        "ready",
+        "The video fal already generated is now in AdPilot. Open this screen to play it. No new video was charged.",
+      );
+      return true;
+    } catch {
+      continue;
+    }
+  }
+  return false;
 }
 
 export async function listCreatives(customerId: string, campaignId: string): Promise<CampaignCreative[]> {
@@ -239,8 +282,10 @@ async function generatePaid(input: {
     }
   }
 
-  if (!wantsVideo) {
-    const note = notes.join(" ");
+  if (!wantsVideo || campaign.creatives.some((item) => item.kind === "video")) {
+    const note = campaign.creatives.some((item) => item.kind === "video")
+      ? `${notes.join(" ")} The video is already in AdPilot. No new fal video was requested.`.trim()
+      : notes.join(" ");
     await finish(campaign, "ready", note);
     return { status: "ready", note };
   }
