@@ -12,6 +12,14 @@
 		B10000000000000000000004 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000004 /* APIClient.swift */; };
 		B10000000000000000000005 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000005 /* AppModel.swift */; };
 		B10000000000000000000006 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000006 /* Views.swift */; };
+		B1000000000000000000000A /* AppColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000A /* AppColors.swift */; };
+		B1000000000000000000000B /* AppSpacing.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000B /* AppSpacing.swift */; };
+		B1000000000000000000000C /* AppTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000C /* AppTypography.swift */; };
+		B1000000000000000000000D /* AppRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000D /* AppRadius.swift */; };
+		B1000000000000000000000E /* AppShadow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000E /* AppShadow.swift */; };
+		B1000000000000000000000F /* AppButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000F /* AppButton.swift */; };
+		B10000000000000000000010 /* AppTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000010 /* AppTextField.swift */; };
+		B10000000000000000000011 /* AppCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000011 /* AppCard.swift */; };
 		B10000000000000000000007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000007 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -22,6 +30,14 @@
 		F10000000000000000000004 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		F10000000000000000000005 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		F10000000000000000000006 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views.swift; sourceTree = "<group>"; };
+		F1000000000000000000000A /* AppColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Theme/AppColors.swift; sourceTree = "<group>"; };
+		F1000000000000000000000B /* AppSpacing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Theme/AppSpacing.swift; sourceTree = "<group>"; };
+		F1000000000000000000000C /* AppTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Theme/AppTypography.swift; sourceTree = "<group>"; };
+		F1000000000000000000000D /* AppRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Theme/AppRadius.swift; sourceTree = "<group>"; };
+		F1000000000000000000000E /* AppShadow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Theme/AppShadow.swift; sourceTree = "<group>"; };
+		F1000000000000000000000F /* AppButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppButton.swift; sourceTree = "<group>"; };
+		F10000000000000000000010 /* AppTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppTextField.swift; sourceTree = "<group>"; };
+		F10000000000000000000011 /* AppCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppCard.swift; sourceTree = "<group>"; };
 		F10000000000000000000007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F10000000000000000000008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F10000000000000000000009 /* AdPilot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AdPilot.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -51,6 +67,14 @@
 			children = (
 				F10000000000000000000001 /* AdPilotApp.swift */,
 				F10000000000000000000002 /* Design.swift */,
+				F1000000000000000000000A /* AppColors.swift */,
+				F1000000000000000000000B /* AppSpacing.swift */,
+				F1000000000000000000000C /* AppTypography.swift */,
+				F1000000000000000000000D /* AppRadius.swift */,
+				F1000000000000000000000E /* AppShadow.swift */,
+				F1000000000000000000000F /* AppButton.swift */,
+				F10000000000000000000010 /* AppTextField.swift */,
+				F10000000000000000000011 /* AppCard.swift */,
 				F10000000000000000000003 /* Models.swift */,
 				F10000000000000000000004 /* APIClient.swift */,
 				F10000000000000000000005 /* AppModel.swift */,
@@ -144,6 +168,14 @@
 				B10000000000000000000004 /* APIClient.swift in Sources */,
 				B10000000000000000000005 /* AppModel.swift in Sources */,
 				B10000000000000000000006 /* Views.swift in Sources */,
+				B1000000000000000000000A /* AppColors.swift in Sources */,
+				B1000000000000000000000B /* AppSpacing.swift in Sources */,
+				B1000000000000000000000C /* AppTypography.swift in Sources */,
+				B1000000000000000000000D /* AppRadius.swift in Sources */,
+				B1000000000000000000000E /* AppShadow.swift in Sources */,
+				B1000000000000000000000F /* AppButton.swift in Sources */,
+				B10000000000000000000010 /* AppTextField.swift in Sources */,
+				B10000000000000000000011 /* AppCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

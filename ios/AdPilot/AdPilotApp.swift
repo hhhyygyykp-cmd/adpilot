@@ -9,9 +9,8 @@ struct AdPilotApp: App {
             RootView()
                 .environmentObject(model)
                 .environment(\.layoutDirection, model.language == "ar" ? .rightToLeft : .leftToRight)
-                .preferredColorScheme(.dark)
-                .tint(AdColor.gold)
-                .background(AdColor.ink)
+                .tint(AppColor.primary)
+                .background(AppColor.background)
                 .task { await model.restore() }
         }
     }
@@ -30,7 +29,7 @@ struct RootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AdColor.ink.ignoresSafeArea())
+        .background(AppColor.background.ignoresSafeArea())
         .onChange(of: model.errorMessage) { _, newValue in
             guard let newValue else {
                 alertText = nil

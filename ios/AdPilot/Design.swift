@@ -29,16 +29,7 @@ struct GoldButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(AdColor.gold.opacity(enabled ? 1 : 0.4))
-                .foregroundStyle(AdColor.ink)
-                .clipShape(Capsule())
-        }
-        .disabled(!enabled)
+        AppButton(title, isEnabled: enabled, action: action)
     }
 }
 
@@ -49,9 +40,9 @@ struct Panel<Content: View>: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(AdColor.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
                     .stroke(AdColor.gold.opacity(0.16), lineWidth: 1)
             )
     }

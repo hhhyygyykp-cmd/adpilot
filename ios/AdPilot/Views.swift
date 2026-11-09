@@ -10,42 +10,53 @@ struct AuthView: View {
     @State private var language = "en"
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+        let canSubmit = !model.busy && email.contains("@") && password.count >= 8 && (!registering || name.count >= 2)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.lg) {
                 Text("AdPilot")
-                    .font(.system(size: 42, weight: .regular, design: .serif))
-                    .foregroundStyle(AdColor.cream)
+                    .font(AppFont.largeTitle)
+                    .foregroundStyle(AppColor.foreground)
                 Text(Copy.text(
                     "Tell us what you want to promote. Your AI advertising agency handles the rest.",
                     "أخبرنا بما تريد الترويج له. وكالتك الإعلانية تتولى الباقي.",
                     language: language
                 ))
-                .foregroundStyle(AdColor.muted)
+                .font(AppFont.secondary)
+                .foregroundStyle(AppColor.mutedForeground)
                 Picker("", selection: $registering) {
                     Text(Copy.text("Create account", "حساب جديد", language: language)).tag(true)
                     Text(Copy.text("Sign in", "دخول", language: language)).tag(false)
                 }
                 .pickerStyle(.segmented)
+                .accessibilityLabel(Copy.text("Account mode", "نوع الحساب", language: language))
                 .onChange(of: registering) { _, _ in Keyboard.dismiss() }
                 if registering {
-                    field(Copy.text("Your name", "اسمك", language: language), text: $name)
+                    AppTextField(
+                        label: Copy.text("Your name", "اسمك", language: language),
+                        text: $name
+                    )
                     Picker(Copy.text("Language", "اللغة", language: language), selection: $language) {
                         Text("English").tag("en")
                         Text("العربية").tag("ar")
                     }
                 }
-                field(Copy.text("Email", "البريد", language: language), text: $email)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
-                SecureField(Copy.text("Password", "كلمة المرور", language: language), text: $password)
-                    .padding(14)
-                    .background(AdColor.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                GoldButton(
-                    title: registering
+                AppTextField(
+                    label: Copy.text("Email", "البريد", language: language),
+                    text: $email,
+                    keyboardType: .emailAddress,
+                    textInputAutocapitalization: .never
+                )
+                AppTextField(
+                    label: Copy.text("Password", "كلمة المرور", language: language),
+                    text: $password,
+                    isSecure: true
+                )
+                AppButton(
+                    registering
                         ? Copy.text("Create account", "إنشاء الحساب", language: language)
                         : Copy.text("Sign in", "تسجيل الدخول", language: language),
-                    enabled: !model.busy && email.contains("@") && password.count >= 8 && (!registering || name.count >= 2)
+                    isLoading: model.busy,
+                    isEnabled: canSubmit
                 ) {
                     Keyboard.dismiss()
                     Task {
@@ -57,16 +68,10 @@ struct AuthView: View {
                     }
                 }
             }
-            .padding(24)
+            .padding(AppSpacing.xl)
         }
         .scrollDismissesKeyboard(.interactively)
-    }
-
-    private func field(_ title: String, text: Binding<String>) -> some View {
-        TextField(title, text: text)
-            .padding(14)
-            .background(AdColor.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(AppColor.background)
     }
 }
 
@@ -77,36 +82,40 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: AppSpacing.lg) {
                     Text(model.activeBusiness.map {
                         Copy.text("Advertising for", "الإعلان لـ", language: model.language) + " " + $0.name
                     } ?? Copy.text("Add a business first", "أضف عملاً أولاً", language: model.language))
-                    .font(.caption)
-                    .foregroundStyle(AdColor.gold)
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.accent)
                     Text(Copy.text(
                         "What would you like to advertise today?",
                         "ماذا تريد أن تعلن اليوم؟",
                         language: model.language
                     ))
-                    .font(.system(size: 34, weight: .regular, design: .serif))
-                    .foregroundStyle(AdColor.cream)
+                    .font(AppFont.largeTitle)
+                    .foregroundStyle(AppColor.foreground)
                     if model.activeBusiness == nil {
-                        GoldButton(title: Copy.text("Add a business", "أضف عملاً", language: model.language)) {
+                        AppButton(Copy.text("Add a business", "أضف عملاً", language: model.language)) {
                             Keyboard.dismiss()
                             model.tab = 3
                         }
                     } else {
-                        Panel {
-                            TextField(Copy.text(
+                        AppTextField(
+                            label: Copy.text("Brief", "الطلب", language: model.language),
+                            placeholder: Copy.text(
                                 "Describe the product, offer, and goal…",
                                 "صف المنتج والعرض والهدف…",
                                 language: model.language
-                            ), text: $prompt, axis: .vertical)
-                            .lineLimit(4...8)
-                        }
-                        GoldButton(
-                            title: Copy.text("Create Advertisement", "أنشئ الإعلان", language: model.language),
-                            enabled: prompt.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 && !model.busy
+                            ),
+                            text: $prompt,
+                            axis: .vertical,
+                            lineLimit: 4...8
+                        )
+                        AppButton(
+                            Copy.text("Create Advertisement", "أنشئ الإعلان", language: model.language),
+                            isLoading: model.busy,
+                            isEnabled: prompt.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 && !model.busy
                         ) {
                             Keyboard.dismiss()
                             let text = prompt
@@ -117,33 +126,39 @@ struct HomeView: View {
                         }
                     }
                     Text(Copy.text("Recent briefs", "آخر الطلبات", language: model.language))
-                        .font(.caption)
-                        .foregroundStyle(AdColor.muted)
+                        .font(AppFont.caption)
+                        .foregroundStyle(AppColor.mutedForeground)
                     if model.campaigns.isEmpty {
                         Text(Copy.text(
                             "No ads yet. Start with a sentence about what you want to promote.",
                             "لا إعلانات بعد. ابدأ بجملة عما تريد الترويج له.",
                             language: model.language
                         ))
-                        .foregroundStyle(AdColor.muted)
+                        .font(AppFont.secondary)
+                        .foregroundStyle(AppColor.mutedForeground)
                     } else {
                         ForEach(Array(model.campaigns.prefix(6))) { item in
                             Button {
                                 Task { await model.openCampaign(item.id) }
                             } label: {
-                                Panel {
-                                    Text(item.title).foregroundStyle(AdColor.cream)
-                                    Text(item.businessName ?? "").font(.caption).foregroundStyle(AdColor.muted)
+                                AppCard {
+                                    Text(item.title)
+                                        .font(AppFont.body)
+                                        .foregroundStyle(AppColor.foreground)
+                                    Text(item.businessName ?? "")
+                                        .font(AppFont.caption)
+                                        .foregroundStyle(AppColor.mutedForeground)
                                 }
                             }
+                            .accessibilityHint(Copy.text("Opens this brief", "يفتح هذا الطلب", language: model.language))
                         }
                     }
                 }
-                .padding(20)
+                .padding(AppSpacing.lg)
             }
             .scrollDismissesKeyboard(.interactively)
+            .background(AppColor.background)
             .navigationTitle("AdPilot")
-            .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
 }
@@ -287,6 +302,8 @@ struct CreateAdView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
+            .background(AdColor.ink)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .navigationTitle(Copy.text("Create Ad", "إنشاء إعلان", language: model.language))
         }
     }
@@ -352,6 +369,8 @@ struct AdsView: View {
                 .listRowBackground(AdColor.surface)
             }
             .scrollContentBackground(.hidden)
+            .background(AdColor.ink)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .navigationTitle(Copy.text("My Ads", "إعلاناتي", language: model.language))
             .overlay {
                 if model.campaigns.isEmpty {
@@ -397,6 +416,8 @@ struct BusinessTab: View {
                 }
             }
             .scrollContentBackground(.hidden)
+            .background(AdColor.ink)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .navigationTitle(Copy.text("My Business", "أعمالي", language: model.language))
             .toolbar {
                 Button(Copy.text("Add", "إضافة", language: model.language)) {
@@ -426,6 +447,7 @@ struct BusinessChat: View {
                 if let business {
                     Text(business.name.isEmpty ? Copy.text("New business", "عمل جديد", language: model.language) : business.name)
                         .font(.title.weight(.regular))
+                        .foregroundStyle(AdColor.cream)
                     if !business.isActive {
                         GoldButton(title: Copy.text("Use for ads", "استخدمه للإعلانات", language: model.language)) {
                             Task {
@@ -466,6 +488,7 @@ struct BusinessChat: View {
             .padding(20)
         }
         .scrollDismissesKeyboard(.interactively)
+        .background(AdColor.ink)
         .task { await reload() }
     }
 
@@ -535,6 +558,8 @@ struct AccountView: View {
                 .padding(20)
             }
             .scrollDismissesKeyboard(.interactively)
+            .background(AdColor.ink)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .navigationTitle(Copy.text("Account", "الحساب", language: model.language))
             .onAppear { name = model.customer?.name ?? "" }
         }
