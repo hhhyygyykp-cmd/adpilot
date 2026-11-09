@@ -29,6 +29,26 @@ struct AppButton: View {
     var imageEdge: AppButtonImageEdge = .leading
     let action: () -> Void
 
+    init(
+        _ title: String,
+        role: AppButtonRole = .primary,
+        size: AppButtonSize = .large,
+        isLoading: Bool = false,
+        isEnabled: Bool = true,
+        systemImage: String? = nil,
+        imageEdge: AppButtonImageEdge = .leading,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.role = role
+        self.size = size
+        self.isLoading = isLoading
+        self.isEnabled = isEnabled
+        self.systemImage = systemImage
+        self.imageEdge = imageEdge
+        self.action = action
+    }
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: AppSpacing.xs) {

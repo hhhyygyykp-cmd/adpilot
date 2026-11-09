@@ -12,6 +12,6 @@ enum AppColor {
     static let primaryForeground = Color("PrimaryForeground")
     static let secondary = Color("Secondary")
     static let destructive = Color("Destructive")
-    static let accent = Color("Accent")
+    static let accent = Color("BrandAccent")
     static let ring = Color("Ring")
 }
