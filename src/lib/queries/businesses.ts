@@ -10,9 +10,9 @@ import type {
   ChatMessage,
   Language,
 } from "../types";
+import { isAffirmation, senseBusiness, senseLine, type BusinessSense } from "../conversation/business-sense";
 import {
   BUSINESS_FIELDS,
-  ask,
   isSkip,
   message,
   nextMissing,
@@ -233,6 +233,53 @@ function applyBusinessAnswer(business: Business, fieldKey: string, text: string)
   return next;
 }
 
+function senseForTurn(name: string, fieldKey: string, answer: string, skipped: boolean): BusinessSense | null {
+  if (fieldKey === "name" || skipped || (fieldKey === "category" && isAffirmation(answer))) {
+    return senseBusiness(name);
+  }
+  if (fieldKey === "category") return senseBusiness(answer);
+  return senseBusiness(`${name} ${answer}`) ?? senseBusiness(name);
+}
+
+function applySense(
+  business: Business,
+  sense: BusinessSense | null,
+  language: Language,
+): { business: Business; sense: BusinessSense | null } {
+  if (!sense) return { business, sense: null };
+  const next = { ...business };
+  const lang = language === "ar" ? "ar" : "en";
+  let applied = false;
+  if (!next.category.trim()) {
+    next.category = sense.category[lang];
+    applied = true;
+  }
+  if (!next.productsServices.trim()) {
+    next.productsServices = sense.services[lang];
+    applied = true;
+  }
+  if (!next.description.trim()) {
+    next.description = sense.description[lang];
+    applied = true;
+  }
+  if (!next.targetCustomers.trim()) {
+    next.targetCustomers = sense.customers[lang];
+    applied = true;
+  }
+  return { business: next, sense: applied ? sense : null };
+}
+
+function questionFor(
+  business: Business,
+  field: (typeof BUSINESS_FIELDS)[number],
+  language: Language,
+  sense: BusinessSense | null,
+): string {
+  const prompt = field.prompt[language];
+  if (!sense || !business.name.trim()) return prompt;
+  return `${senseLine(business.name.trim(), sense, language)} ${prompt}`;
+}
+
 async function persistBusiness(business: Business, complete: boolean) {
   const rows = await sql<BusinessRow>(
     `update businesses set
@@ -340,6 +387,14 @@ export async function continueBusinessOnboarding(input: {
     next = applyBusinessAnswer(next, field.key, userText);
   }
 
+  if (field.key === "category" && isAffirmation(userText)) {
+    next.category = "";
+  }
+
+  const sensed = senseForTurn(next.name, field.key, userText, input.skip || isSkip(userText));
+  const understood = applySense(next, sensed, input.language);
+  next = understood.business;
+
   const values = valuesFromBusiness(next);
   if (field.key === "name" && next.name) values.name = next.name;
   const remaining = BUSINESS_FIELDS.filter((item) => item.key !== field.key);
@@ -385,7 +440,7 @@ export async function continueBusinessOnboarding(input: {
     return persistBusiness(next, true);
   }
 
-  messages.push(ask(nextField, input.language));
+  messages.push(message("agent", questionFor(next, nextField, input.language, understood.sense), nextField.key));
   next.onboardingState = { messages, awaiting: nextField.key };
   next.onboardingComplete = false;
   return persistBusiness(next, false);

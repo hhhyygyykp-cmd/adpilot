@@ -134,8 +134,8 @@ export const BUSINESS_FIELDS: FieldSpec[] = [
     key: "category",
     required: false,
     prompt: {
-      en: "What category is it? Restaurant, clinic, shop — or skip.",
-      ar: "ما فئته؟ مطعم، عيادة، متجر — أو تخطَّ.",
+      en: "What do you do there? Say it in your own words, or skip.",
+      ar: "ماذا تفعلون هناك؟ صِفْه بكلامك، أو تخطَّ.",
     },
   },
   {
