@@ -74,12 +74,12 @@ function requestHostnames(request: Request): Set<string> {
 }
 
 export function isBrowserRequest(request: Request): boolean {
-  return Boolean(
-    request.headers.get("origin") ||
-      request.headers.get("sec-fetch-site") ||
-      request.headers.get("sec-fetch-mode") ||
-      request.headers.get("sec-fetch-dest"),
-  );
+  const site = (request.headers.get("sec-fetch-site") ?? "").toLowerCase();
+  // A page cannot hide these. Sec-Fetch-Mode alone is not enough: the iPhone
+  // URLSession and other native clients can send it without being a website.
+  if (site === "cross-site" || site === "same-origin" || site === "same-site") return true;
+  const origin = request.headers.get("origin");
+  return Boolean(origin && origin !== "null");
 }
 
 export function sameOrigin(request: Request): boolean {
