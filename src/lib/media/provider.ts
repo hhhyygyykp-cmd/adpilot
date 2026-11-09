@@ -31,10 +31,8 @@ export class FalProvider implements MediaProvider {
     prompt: string,
     image?: { buffer: Buffer; mimeType: string },
   ): Promise<GeneratedMedia | { unavailable: string }> {
-    if (!image) {
-      return { unavailable: "Hailuo image-to-video needs a still first. No slideshow was stored as video." };
-    }
-    return falGenerateVideo(prompt, image.buffer, image.mimeType);
+    void image;
+    return falGenerateVideo(prompt);
   }
 }
 

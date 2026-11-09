@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ChatThread } from "@/components/chat-thread";
+import { FalStudio } from "@/components/fal-studio";
 import { Shell } from "@/components/shell";
 import { useSession } from "@/components/providers";
 import { api } from "@/lib/api-client";
@@ -151,6 +152,7 @@ export default function BusinessDetailPage() {
       <section className="mt-10 grid gap-6 md:grid-cols-2">
         <div className="panel rounded-3xl p-6">
           <h2 className="text-xs uppercase tracking-[0.18em] text-[var(--gold)]">{t("business.logo")}</h2>
+          <FalStudio kinds={["logo"]} initialPrompt={business.name ? `Logo for ${business.name}` : ""} />
           {logos.length === 0 ? (
             <p className="mt-3 text-sm text-[var(--muted)]">{t("business.noLogo")}</p>
           ) : (

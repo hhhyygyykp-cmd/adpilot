@@ -200,7 +200,7 @@ export function generateVideoRefused(): ToolErr {
     tool: "generate_video",
     ok: false,
     error:
-      "Paid MiniMax Hailuo video on fal needs FAL_KEY and explicit customer authorization. Nothing was labeled as video.",
+      "Paid Kling 2.5 Turbo Pro video on fal needs FAL_KEY and an explicit Generate click. Nothing was labeled as video.",
   };
 }
 

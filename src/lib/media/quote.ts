@@ -1,9 +1,15 @@
 import type { Campaign, MediaQuote } from "../types";
+import {
+  FAL_IMAGE_MODEL,
+  FAL_VIDEO_MODEL,
+  FLUX_USD_PER_MEGAPIXEL,
+  KLING_USD_PER_SECOND,
+} from "./fal-models";
 
-export const FAL_STILL_MODEL = "fal-ai/flux/schnell";
-export const FAL_VIDEO_MODEL = "minimax/h3-max-turbo/image-to-video";
-export const FAL_STILL_USD = 0.003;
-export const FAL_VIDEO_USD_PER_SEC = 0.025;
+export const FAL_STILL_MODEL = FAL_IMAGE_MODEL;
+export const FAL_VIDEO_MODEL_ID = FAL_VIDEO_MODEL;
+export const FAL_STILL_USD = Number((FLUX_USD_PER_MEGAPIXEL * 0.262144).toFixed(6));
+export const FAL_VIDEO_USD_PER_SEC = KLING_USD_PER_SECOND;
 export const FAL_VIDEO_SECONDS = 5;
 export const PAID_IMAGE_LIMIT = 3;
 export const PAID_VIDEO_LIMIT = 2;
@@ -44,8 +50,8 @@ export function buildMediaQuote(input: {
     video: wantsVideo
       ? {
           provider: "fal",
-          model: FAL_VIDEO_MODEL,
-          label: "MiniMax Hailuo H3 Max Turbo",
+          model: FAL_VIDEO_MODEL_ID,
+          label: "Kling 2.5 Turbo Pro",
           usd: videoUsd,
           seconds: FAL_VIDEO_SECONDS,
           remaining: videoRemaining,

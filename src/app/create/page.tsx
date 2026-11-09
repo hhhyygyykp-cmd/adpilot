@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { BriefCard } from "@/components/brief-card";
+import { FalStudio } from "@/components/fal-studio";
 import { ChatThread } from "@/components/chat-thread";
 import { Shell } from "@/components/shell";
 import { useSession } from "@/components/providers";
@@ -195,6 +196,7 @@ function CreateAd() {
           )}
         </div>
       ) : null}
+      <FalStudio />
     </Shell>
   );
 }

@@ -200,18 +200,17 @@ async function generatePaid(input: {
   const { campaign, prompt, videoPrompt, wantsVideo, keyReady } = input;
   const quote = campaign.mediaQuote;
   if (!keyReady) {
-    const note = `Waiting for FAL_KEY. Estimated ${formatUsd(quote.totalUsd)} (FLUX.1 schnell ${formatUsd(quote.still.usd)}${quote.video ? `, Hailuo ${formatUsd(quote.video.usd)}` : ""}). No paid still or video was generated.`;
+    const note = `Waiting for FAL_KEY. Estimated ${formatUsd(quote.totalUsd)} (FLUX.1 schnell ${formatUsd(quote.still.usd)}${quote.video ? `, Kling ${formatUsd(quote.video.usd)}` : ""}). No paid still or video was generated.`;
     await finish(campaign, "not_started", note);
     return { status: "not_started", note };
   }
 
   const notes: string[] = [];
-  let frame: { buffer: Buffer; mimeType: string } | null = null;
   const claimedImage = await claimPaidSlot(campaign, "image", PAID_IMAGE_LIMIT);
 
   if (claimedImage) {
     try {
-      const still = await falGenerateStill(prompt);
+      const still = await falGenerateStill(prompt, campaign.customerId);
       await storeCreative({
         campaign,
         media: still,
@@ -219,24 +218,12 @@ async function generatePaid(input: {
         filename: `${campaign.productName || "ad"}.jpg`,
         note: `Paid FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}). Authorized by the customer.`,
       });
-      frame = { buffer: still.buffer, mimeType: still.mimeType };
       notes.push(`Paid still: FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}).`);
     } catch (error) {
       await releasePaidSlot(campaign, "image");
       throw error;
     }
-  } else if (wantsVideo) {
-    const existing = campaign.creatives.find((item) => item.kind === "image");
-    const owned = existing ? await getOwnedCreative(campaign.customerId, existing.id) : null;
-    if (!owned) {
-      const note = `Paid still limit reached (${PAID_IMAGE_LIMIT}). Hailuo needs a still, and none is on file.`;
-      await finish(campaign, "failed", note);
-      return { status: "failed", note };
-    }
-    const { readUpload } = await import("../storage");
-    frame = { buffer: await readUpload(owned.storage_key), mimeType: owned.mime_type };
-    notes.push("Reused the last authorized still for Hailuo. No extra fal image was billed.");
-  } else {
+  } else if (!wantsVideo) {
     const note = `Paid still limit reached (${PAID_IMAGE_LIMIT} per campaign). No extra fal image was requested.`;
     await finish(campaign, "failed", note);
     return { status: "failed", note };
@@ -247,21 +234,16 @@ async function generatePaid(input: {
     await finish(campaign, "ready", note);
     return { status: "ready", note };
   }
-  if (!frame) {
-    const note = `${notes.join(" ")} Hailuo image-to-video needs a still. Nothing was labeled as video.`;
-    await finish(campaign, "ready", note);
-    return { status: "ready", note };
-  }
   const claimedVideo = await claimPaidSlot(campaign, "video", PAID_VIDEO_LIMIT);
   if (!claimedVideo) {
-    const note = `${notes.join(" ")} Paid video limit reached (${PAID_VIDEO_LIMIT} per campaign). No Hailuo call was made.`;
+    const note = `${notes.join(" ")} Paid video limit reached (${PAID_VIDEO_LIMIT} per campaign). No Kling call was made.`;
     await finish(campaign, "ready", note);
     return { status: "ready", note };
   }
 
-  let video: GeneratedMedia | { unavailable: string };
+  let video: GeneratedMedia;
   try {
-    video = await falGenerateVideo(videoPrompt, frame.buffer, frame.mimeType);
+    video = await falGenerateVideo(videoPrompt, campaign.customerId);
   } catch (error) {
     await releasePaidSlot(campaign, "video");
     throw error;
@@ -277,9 +259,9 @@ async function generatePaid(input: {
     media: video,
     prompt: videoPrompt,
     filename: `${campaign.productName || "ad"}.mp4`,
-    note: `Paid MiniMax Hailuo H3 Max Turbo image-to-video on fal (${quote.video ? formatUsd(quote.video.usd) : ""}). Authorized by the customer.`,
+    note: `Paid Kling 2.5 Turbo Pro text-to-video on fal, 5s 16:9 (${quote.video ? formatUsd(quote.video.usd) : ""}). Authorized by the customer.`,
   });
-  notes.push(`Paid video: MiniMax Hailuo H3 Max Turbo on fal (${quote.video ? formatUsd(quote.video.usd) : ""}).`);
+  notes.push(`Paid video: Kling 2.5 Turbo Pro on fal (${quote.video ? formatUsd(quote.video.usd) : ""}).`);
   const note = notes.join(" ");
   await finish(campaign, "ready", note);
   return { status: "ready", note };
