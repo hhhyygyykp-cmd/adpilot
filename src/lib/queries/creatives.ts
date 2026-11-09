@@ -164,6 +164,32 @@ export async function generateCampaignMedia(input: {
   }
 }
 
+async function claimPaidSlot(
+  campaign: Campaign,
+  kind: "image" | "video",
+  limit: number,
+): Promise<boolean> {
+  const column = kind === "image" ? "paid_image_count" : "paid_video_count";
+  const rows = await sql<{ id: string }>(
+    `update campaigns
+     set ${column} = ${column} + 1, updated_at = now()
+     where id = $1 and customer_id = $2 and ${column} < $3
+     returning id`,
+    [campaign.id, campaign.customerId, limit],
+  );
+  return rows.length > 0;
+}
+
+async function releasePaidSlot(campaign: Campaign, kind: "image" | "video") {
+  const column = kind === "image" ? "paid_image_count" : "paid_video_count";
+  await sql(
+    `update campaigns
+     set ${column} = greatest(${column} - 1, 0), updated_at = now()
+     where id = $1 and customer_id = $2`,
+    [campaign.id, campaign.customerId],
+  );
+}
+
 async function generatePaid(input: {
   campaign: Campaign;
   prompt: string;
@@ -181,22 +207,24 @@ async function generatePaid(input: {
 
   const notes: string[] = [];
   let frame: { buffer: Buffer; mimeType: string } | null = null;
+  const claimedImage = await claimPaidSlot(campaign, "image", PAID_IMAGE_LIMIT);
 
-  if (campaign.paidImageCount < PAID_IMAGE_LIMIT) {
-    const still = await falGenerateStill(prompt);
-    await storeCreative({
-      campaign,
-      media: still,
-      prompt,
-      filename: `${campaign.productName || "ad"}.jpg`,
-      note: `Paid FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}). Authorized by the customer.`,
-    });
-    await sql(
-      `update campaigns set paid_image_count = paid_image_count + 1, updated_at = now() where id = $1 and customer_id = $2`,
-      [campaign.id, campaign.customerId],
-    );
-    frame = { buffer: still.buffer, mimeType: still.mimeType };
-    notes.push(`Paid still: FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}).`);
+  if (claimedImage) {
+    try {
+      const still = await falGenerateStill(prompt);
+      await storeCreative({
+        campaign,
+        media: still,
+        prompt,
+        filename: `${campaign.productName || "ad"}.jpg`,
+        note: `Paid FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}). Authorized by the customer.`,
+      });
+      frame = { buffer: still.buffer, mimeType: still.mimeType };
+      notes.push(`Paid still: FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}).`);
+    } catch (error) {
+      await releasePaidSlot(campaign, "image");
+      throw error;
+    }
   } else if (wantsVideo) {
     const existing = campaign.creatives.find((item) => item.kind === "image");
     const owned = existing ? await getOwnedCreative(campaign.customerId, existing.id) : null;
@@ -219,19 +247,27 @@ async function generatePaid(input: {
     await finish(campaign, "ready", note);
     return { status: "ready", note };
   }
-  if (campaign.paidVideoCount >= PAID_VIDEO_LIMIT) {
-    const note = `${notes.join(" ")} Paid video limit reached (${PAID_VIDEO_LIMIT} per campaign). No Hailuo call was made.`;
-    await finish(campaign, "ready", note);
-    return { status: "ready", note };
-  }
   if (!frame) {
     const note = `${notes.join(" ")} Hailuo image-to-video needs a still. Nothing was labeled as video.`;
     await finish(campaign, "ready", note);
     return { status: "ready", note };
   }
+  const claimedVideo = await claimPaidSlot(campaign, "video", PAID_VIDEO_LIMIT);
+  if (!claimedVideo) {
+    const note = `${notes.join(" ")} Paid video limit reached (${PAID_VIDEO_LIMIT} per campaign). No Hailuo call was made.`;
+    await finish(campaign, "ready", note);
+    return { status: "ready", note };
+  }
 
-  const video = await falGenerateVideo(videoPrompt, frame.buffer, frame.mimeType);
-  if (video.kind !== "video" || video.mimeType !== "video/mp4") {
+  let video: GeneratedMedia | { unavailable: string };
+  try {
+    video = await falGenerateVideo(videoPrompt, frame.buffer, frame.mimeType);
+  } catch (error) {
+    await releasePaidSlot(campaign, "video");
+    throw error;
+  }
+  if (!("kind" in video) || video.kind !== "video" || video.mimeType !== "video/mp4") {
+    await releasePaidSlot(campaign, "video");
     const note = `${notes.join(" ")} fal did not return moving mp4, so nothing was stored as video.`;
     await finish(campaign, "ready", note);
     return { status: "ready", note };
@@ -243,10 +279,6 @@ async function generatePaid(input: {
     filename: `${campaign.productName || "ad"}.mp4`,
     note: `Paid MiniMax Hailuo H3 Max Turbo image-to-video on fal (${quote.video ? formatUsd(quote.video.usd) : ""}). Authorized by the customer.`,
   });
-  await sql(
-    `update campaigns set paid_video_count = paid_video_count + 1, updated_at = now() where id = $1 and customer_id = $2`,
-    [campaign.id, campaign.customerId],
-  );
   notes.push(`Paid video: MiniMax Hailuo H3 Max Turbo on fal (${quote.video ? formatUsd(quote.video.usd) : ""}).`);
   const note = notes.join(" ");
   await finish(campaign, "ready", note);

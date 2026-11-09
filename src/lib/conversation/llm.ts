@@ -1,3 +1,4 @@
+import { rateLimit } from "../rate-limit";
 import type { Business, CampaignFacts } from "../types";
 import { emptyFacts } from "./extract";
 
@@ -50,6 +51,9 @@ export class OpenAiLlmProvider implements LlmProvider {
   async interpret(input: InterpretInput): Promise<Partial<CampaignFacts> | null> {
     const key = process.env.OPENAI_API_KEY?.trim();
     if (!key) return null;
+    const actor = input.business?.customerId || "shared";
+    const limited = rateLimit(`openai:${actor}`, 40, 60 * 60 * 1000);
+    if (!limited.ok) return null;
     const businessContext = input.business
       ? `Business: ${input.business.name}. Products/services: ${input.business.productsServices}. Goals: ${input.business.marketingGoals}.`
       : "No business profile.";
