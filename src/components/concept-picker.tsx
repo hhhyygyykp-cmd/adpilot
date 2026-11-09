@@ -107,7 +107,8 @@ function ConceptCard({
       </div>
       <p className="mt-3 text-sm font-medium leading-6">{concept.hook}</p>
       <dl className="mt-3 grid gap-2 text-sm">
-        <Row label={t("concepts.core")} value={concept.coreMessage} />
+        {concept.headline ? <Row label={t("concepts.headline")} value={concept.headline} /> : null}
+        <Row label={t("concepts.supporting")} value={concept.supportingCopy || concept.coreMessage} />
         <Row label={t("concepts.benefit")} value={concept.audienceBenefit} />
         <Row label={t("concepts.direction")} value={concept.creativeDirection} />
         <Row label={t("concepts.format")} value={t(`brief.${concept.recommendedFormat}`)} />

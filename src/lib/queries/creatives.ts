@@ -2,6 +2,10 @@ import "server-only";
 
 import { newId } from "../crypto";
 import { parseJson, sql } from "../db";
+import { selectedCopy } from "../agent/strategies";
+import { loadBrandMedia, realProductRequired, type BrandMedia } from "../media/brand-assets";
+import { composeStillAd } from "../media/compose-still";
+import { composeVideoAd } from "../media/compose-video";
 import { downloadFalFile, falGenerateStill, falGenerateVideo } from "../media/fal";
 import { findCompletedFalVideos } from "../media/fal-recover";
 import { publicFalError } from "../media/fal-key";
@@ -168,8 +172,17 @@ export async function generateCampaignMedia(input: {
   );
 
   try {
+    const brand = await loadBrandMedia(campaign.customerId, campaign.businessId);
+    if (realProductRequired(campaign.existingPhotosNote, campaign.mustAppear, Boolean(brand.product)) && !brand.product) {
+      const note = "Upload the real product photo before a paid ad. AdPilot will not invent a different-looking product.";
+      await finish(campaign, "failed", note);
+      return { status: "failed", note };
+    }
+    if (brand.product) {
+      return await generateReferenceAd({ campaign, business: input.business, wantsVideo, brand });
+    }
     if (input.authorizePaid) {
-      return await generatePaid({ campaign, prompt, videoPrompt, wantsVideo, keyReady });
+      return await generatePaid({ campaign, business: input.business, prompt, videoPrompt, wantsVideo, keyReady, brand });
     }
     if (keyReady) {
       const note =
@@ -240,12 +253,58 @@ async function releasePaidSlot(campaign: Campaign, kind: "image" | "video") {
   );
 }
 
+async function generateReferenceAd(input: {
+  campaign: Campaign;
+  business: Business;
+  wantsVideo: boolean;
+  brand: BrandMedia;
+}): Promise<{ status: GenerationStatus; note: string }> {
+  const copy = selectedCopy(input.campaign, input.business);
+  const photo = input.brand.product;
+  if (!photo) throw new Error("The product photograph disappeared.");
+  const still = await composeStillAd({
+    photo,
+    logo: input.brand.logo,
+    businessName: input.business.name,
+    ...copy,
+  });
+  await storeCreative({
+    campaign: input.campaign,
+    media: { buffer: still, mimeType: "image/jpeg", provider: "customer-photo", kind: "image" },
+    prompt: "Customer product photograph with the marketing layout.",
+    filename: `${input.campaign.productName || "ad"}.jpg`,
+    note: "Finished ad from your product photograph. No substitute product was generated.",
+  });
+  const notes = ["Finished ad from your product photograph. No substitute product was generated."];
+  if (input.wantsVideo && !input.campaign.creatives.some((item) => item.kind === "video")) {
+    const video = await composeVideoAd({
+      footage: photo,
+      logo: input.brand.logo,
+      businessName: input.business.name,
+      ...copy,
+    });
+    await storeCreative({
+      campaign: input.campaign,
+      media: { buffer: video, mimeType: "video/mp4", provider: "customer-photo", kind: "video" },
+      prompt: "Edited advertisement from the customer photograph.",
+      filename: `${input.campaign.productName || "ad"}.mp4`,
+      note: "Edited advertisement from your photograph: title, offer, and call to action. No fal video charge.",
+    });
+    notes.push("Edited video from your photograph. No fal video charge.");
+  }
+  const note = notes.join(" ");
+  await finish(input.campaign, "ready", note);
+  return { status: "ready", note };
+}
+
 async function generatePaid(input: {
   campaign: Campaign;
+  business: Business;
   prompt: string;
   videoPrompt: string;
   wantsVideo: boolean;
   keyReady: boolean;
+  brand: BrandMedia;
 }): Promise<{ status: GenerationStatus; note: string }> {
   const { campaign, prompt, videoPrompt, wantsVideo, keyReady } = input;
   const quote = campaign.mediaQuote;
@@ -263,14 +322,21 @@ async function generatePaid(input: {
     if (claimedImage) {
       try {
         const still = await falGenerateStill(prompt, campaign.customerId);
+        const copy = selectedCopy(campaign, input.business);
+        const finished = await composeStillAd({
+          photo: still.buffer,
+          logo: input.brand.logo,
+          businessName: input.business.name,
+          ...copy,
+        });
         await storeCreative({
           campaign,
-          media: still,
+          media: { buffer: finished, mimeType: "image/jpeg", provider: "fal", kind: "image" },
           prompt,
           filename: `${campaign.productName || "ad"}.jpg`,
-          note: `Paid FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}). Authorized by the customer.`,
+          note: `Finished ad. Photograph: FLUX.1 schnell (${formatUsd(quote.still.usd)}). Headline, offer, and call to action added in AdPilot.`,
         });
-        notes.push(`Paid still: FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}).`);
+        notes.push(`Finished still: FLUX.1 schnell photograph plus the marketing layout (${formatUsd(quote.still.usd)}).`);
       } catch (error) {
         await releasePaidSlot(campaign, "image");
         throw error;
@@ -312,14 +378,30 @@ async function generatePaid(input: {
     await finish(campaign, "ready", note);
     return { status: "ready", note };
   }
+  let edited: Buffer;
+  try {
+    const copy = selectedCopy(campaign, input.business);
+    edited = await composeVideoAd({
+      footage: video.buffer,
+      logo: input.brand.logo,
+      businessName: input.business.name,
+      ...copy,
+    });
+  } catch (error) {
+    await releasePaidSlot(campaign, "video");
+    const reason = publicFalError(error, "The advertisement edit failed.");
+    const note = `${notes.join(" ")} fal returned a clip, but the title and call-to-action edit failed, so the unfinished clip was not saved. ${reason}`.trim();
+    await finish(campaign, "ready", note);
+    return { status: "ready", note };
+  }
   await storeCreative({
     campaign,
-    media: video,
+    media: { buffer: edited, mimeType: "video/mp4", provider: "fal", kind: "video" },
     prompt: videoPrompt,
     filename: `${campaign.productName || "ad"}.mp4`,
-    note: `Paid Kling 2.5 Turbo Pro text-to-video on fal, 5s 16:9 (${quote.video ? formatUsd(quote.video.usd) : ""}). Authorized by the customer.`,
+    note: `Finished video ad. Motion: Kling 2.5 Turbo Pro, 5s (${quote.video ? formatUsd(quote.video.usd) : ""}). Title card, lower third, and call to action edited in AdPilot.`,
   });
-  notes.push(`Paid video: Kling 2.5 Turbo Pro on fal (${quote.video ? formatUsd(quote.video.usd) : ""}).`);
+  notes.push(`Finished video: Kling motion plus title, offer, and call to action (${quote.video ? formatUsd(quote.video.usd) : ""}).`);
   const note = notes.join(" ");
   await finish(campaign, "ready", note);
   return { status: "ready", note };

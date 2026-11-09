@@ -177,6 +177,8 @@ export const ar: typeof en = {
     recommend: "موصى به",
     letAi: "استخدم الاتجاه الموصى به",
     hook: "الخطاف",
+    headline: "العنوان",
+    supporting: "النص المساند",
     core: "الرسالة الأساسية",
     benefit: "فائدة الجمهور",
     direction: "التوجيه الإبداعي",

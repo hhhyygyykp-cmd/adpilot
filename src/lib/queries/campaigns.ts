@@ -7,6 +7,7 @@ import {
   applyFieldAnswer,
   ask,
   awaitingFromFacts,
+  briefingFields,
   buildBrief,
   campaignFields,
   greeting,
@@ -17,6 +18,7 @@ import {
   summaryPrompt,
 } from "../conversation/engine";
 import { importMissingFalVideo, listCreatives } from "./creatives";
+import { hasProductPhoto } from "../media/brand-assets";
 import { redactFalMessage } from "../media/fal-key";
 import { buildMediaQuote, falKeyConfigured } from "../media/quote";
 import { emptyFacts } from "../conversation/extract";
@@ -297,6 +299,13 @@ export async function getCampaign(customerId: string, id: string) {
   );
   if (!rows[0]) return null;
   const campaign = mapCampaign(rows[0]);
+  if (await hasProductPhoto(customerId, campaign.businessId)) {
+    campaign.mediaQuote = buildMediaQuote({
+      campaign,
+      keyConfigured: falKeyConfigured(),
+      hasReferencePhoto: true,
+    });
+  }
   campaign.creatives = await listCreatives(customerId, id);
   if (await importMissingFalVideo(campaign)) return getCampaign(customerId, id);
   return campaign;
@@ -328,7 +337,7 @@ export async function startCampaign(input: {
     greeting(input.language, input.business.name || "your business", historyLine, input.prompt),
     message("customer", input.prompt),
   ];
-  const missing = nextMissing(campaignFields(input.prompt), facts as unknown as Record<string, unknown>);
+  const missing = nextMissing(briefingFields(input.prompt), facts as unknown as Record<string, unknown>);
   let status: CampaignStatus = "drafting";
   let brief: InterpretedBrief | Record<string, never> = {};
   let plan: MarketingPlan | Record<string, never> = emptyPlan(

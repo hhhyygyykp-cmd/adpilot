@@ -160,6 +160,8 @@ export type MarketingConcept = {
   lane: ConceptLane;
   title: string;
   hook: string;
+  headline?: string;
+  supportingCopy?: string;
   coreMessage: string;
   audienceBenefit: string;
   creativeDirection: string;

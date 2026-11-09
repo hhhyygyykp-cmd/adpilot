@@ -77,6 +77,8 @@ struct Concept: Decodable, Identifiable {
     let id: String
     var title: String
     var hook: String
+    var headline: String
+    var supportingCopy: String
     var coreMessage: String
     var audienceBenefit: String
     var creativeDirection: String
@@ -88,6 +90,8 @@ struct Concept: Decodable, Identifiable {
         id = try c.decode(String.self, forKey: .id)
         title = c.str(.title)
         hook = c.str(.hook)
+        headline = c.str(.headline)
+        supportingCopy = c.str(.supportingCopy)
         coreMessage = c.str(.coreMessage)
         audienceBenefit = c.str(.audienceBenefit)
         creativeDirection = c.str(.creativeDirection)
@@ -96,7 +100,7 @@ struct Concept: Decodable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, hook, coreMessage, audienceBenefit, creativeDirection, recommendedFormat, cta
+        case id, title, hook, headline, supportingCopy, coreMessage, audienceBenefit, creativeDirection, recommendedFormat, cta
     }
 }
 

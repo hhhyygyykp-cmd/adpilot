@@ -174,6 +174,8 @@ export const en = {
     recommend: "Recommended",
     letAi: "Use the recommended concept",
     hook: "Hook",
+    headline: "Headline",
+    supporting: "Supporting copy",
     core: "Core message",
     benefit: "Audience benefit",
     direction: "Creative direction",

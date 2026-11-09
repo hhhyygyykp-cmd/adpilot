@@ -242,7 +242,12 @@ struct CreateAdView: View {
                                         Text(concept.hook)
                                             .font(AppFont.body)
                                             .foregroundStyle(AppColor.foreground)
-                                        Text(concept.coreMessage)
+                                        if !concept.headline.isEmpty {
+                                            Text(concept.headline)
+                                                .font(AppFont.section)
+                                                .foregroundStyle(AppColor.accent)
+                                        }
+                                        Text(concept.supportingCopy.isEmpty ? concept.coreMessage : concept.supportingCopy)
                                             .font(AppFont.caption)
                                             .foregroundStyle(AppColor.mutedForeground)
                                         if set.selectedId == concept.id {

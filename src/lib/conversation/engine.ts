@@ -276,7 +276,11 @@ export async function interpretCampaignPrompt(input: {
       llmFacts = null;
     }
   }
-  const facts = mergeFacts(emptyFacts(), { ...llmFacts, ...structured });
+  const facts = completeFactsFromProfile(
+    mergeFacts(emptyFacts(), { ...llmFacts, ...structured }),
+    input.business,
+    input.prompt,
+  );
   return { facts, interpreter: interpreterLabel(provider) };
 }
 
@@ -365,8 +369,31 @@ export function summaryPrompt(language: Language): ChatMessage {
   return message("agent", text, "summary");
 }
 
+export function briefingFields(prompt: string): FieldSpec[] {
+  return campaignFields(prompt).filter((field) => field.required);
+}
+
+export function completeFactsFromProfile(facts: CampaignFacts, business: Business, prompt: string): CampaignFacts {
+  const next = { ...facts };
+  if (!next.productName?.trim()) {
+    const service = business.productsServices
+      .split(/[,;\n]/)
+      .map((part) => part.trim())
+      .find((part) => part.length >= 3);
+    next.productName = service || prompt.trim().slice(0, 120) || business.name;
+  }
+  if (!next.objective?.trim()) {
+    next.objective = business.marketingGoals.trim() || `Promote ${next.productName}`;
+  }
+  if (!next.audienceNote?.trim() && business.targetCustomers.trim()) {
+    next.audienceNote = business.targetCustomers.trim();
+  }
+  if (!next.formatPreference) next.formatPreference = "ai_recommend";
+  return next;
+}
+
 export function awaitingFromFacts(facts: CampaignFacts, prompt = ""): string | null {
-  const next = nextMissing(campaignFields(prompt), facts as unknown as Record<string, unknown>);
+  const next = nextMissing(briefingFields(prompt), facts as unknown as Record<string, unknown>);
   return next?.key ?? "summary";
 }
 

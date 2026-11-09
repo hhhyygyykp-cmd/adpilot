@@ -25,14 +25,15 @@ export function campaignWantsVideo(campaign: Pick<Campaign, "formatPreference" |
 export function buildMediaQuote(input: {
   campaign: Pick<Campaign, "formatPreference" | "conceptSet" | "paidImageCount" | "paidVideoCount">;
   keyConfigured: boolean;
+  hasReferencePhoto?: boolean;
 }): MediaQuote {
   const wantsVideo = campaignWantsVideo(input.campaign);
   const paidImageCount = input.campaign.paidImageCount ?? 0;
   const paidVideoCount = input.campaign.paidVideoCount ?? 0;
   const stillRemaining = Math.max(0, PAID_IMAGE_LIMIT - paidImageCount);
   const videoRemaining = Math.max(0, PAID_VIDEO_LIMIT - paidVideoCount);
-  const stillUsd = FAL_STILL_USD;
-  const videoUsd = wantsVideo ? FAL_VIDEO_USD_PER_SEC * FAL_VIDEO_SECONDS : 0;
+  const stillUsd = input.hasReferencePhoto ? 0 : FAL_STILL_USD;
+  const videoUsd = wantsVideo ? (input.hasReferencePhoto ? 0 : FAL_VIDEO_USD_PER_SEC * FAL_VIDEO_SECONDS) : 0;
   const chargesStill = paidImageCount === 0 && stillRemaining > 0;
   const chargesVideo = wantsVideo && videoRemaining > 0;
   const due = (chargesStill ? stillUsd : 0) + (chargesVideo ? videoUsd : 0);
@@ -45,7 +46,7 @@ export function buildMediaQuote(input: {
     still: {
       provider: "fal",
       model: FAL_STILL_MODEL,
-      label: "FLUX.1 schnell",
+      label: input.hasReferencePhoto ? "Your photograph" : "FLUX.1 schnell",
       usd: stillUsd,
       remaining: stillRemaining,
       limit: PAID_IMAGE_LIMIT,
@@ -54,7 +55,7 @@ export function buildMediaQuote(input: {
       ? {
           provider: "fal",
           model: FAL_VIDEO_MODEL_ID,
-          label: "Kling 2.5 Turbo Pro",
+          label: input.hasReferencePhoto ? "Edited from your photo" : "Kling 2.5 Turbo Pro",
           usd: videoUsd,
           seconds: FAL_VIDEO_SECONDS,
           remaining: videoRemaining,
