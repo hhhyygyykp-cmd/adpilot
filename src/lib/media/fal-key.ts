@@ -15,6 +15,16 @@ export function falKeyConfigured(): boolean {
   return readFalKey().length > 0;
 }
 
+export const INCOMPLETE_FAL_KEY =
+  "The fal key on this server is incomplete. Open fal.ai/dashboard/keys, create a key, and copy the full value. It has an id, a colon, and a secret, all on one line.";
+
+export function falKeyProblem(key = readFalKey()): string | null {
+  if (!key) return "FAL_KEY is not on the server.";
+  const splitAt = key.indexOf(":");
+  if (splitAt <= 0 || splitAt >= key.length - 1) return INCOMPLETE_FAL_KEY;
+  return null;
+}
+
 export function redactFalMessage(message: string): string {
   if (!message.trim()) return "";
   if (/invalid header value/i.test(message)) {
@@ -28,8 +38,56 @@ export function redactFalMessage(message: string): string {
 }
 
 export function publicFalError(error: unknown, fallback = "fal request failed"): string {
-  const message = error instanceof Error && error.message ? error.message : fallback;
-  return redactFalMessage(message);
+  const status = statusOf(error);
+  if (status === 401) {
+    return "fal rejected this key. Create a new key at fal.ai/dashboard/keys and set the full value, including the colon, on one line.";
+  }
+  if (status === 403) {
+    return "This fal key is not allowed to generate images. Create a key with the API preset at fal.ai/dashboard/keys.";
+  }
+  const message = error instanceof Error && error.message.trim() ? error.message.trim() : "";
+  const detail = detailOf(error);
+  const code = causeCode(error);
+  const text = [message, detail, code].filter(Boolean).join(" — ") || fallback;
+  if (/fetch failed|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|UND_ERR_CONNECT|UND_ERR_SOCKET/i.test(text)) {
+    return "Could not reach fal from this Mac. Check the internet connection, then try again.";
+  }
+  return redactFalMessage(text) || fallback;
+}
+
+function statusOf(error: unknown): number {
+  if (!error || typeof error !== "object" || !("status" in error)) return 0;
+  const status = Number(error.status);
+  return Number.isInteger(status) ? status : 0;
+}
+
+function detailOf(error: unknown): string {
+  if (!error || typeof error !== "object" || !("body" in error)) return "";
+  const body = error.body;
+  if (!body || typeof body !== "object" || !("detail" in body)) return "";
+  const detail = body.detail;
+  if (typeof detail === "string") return detail.trim();
+  if (!Array.isArray(detail)) return "";
+  return detail
+    .map((item) => {
+      if (!item || typeof item !== "object" || !("msg" in item)) return "";
+      return typeof item.msg === "string" ? item.msg.trim() : "";
+    })
+    .filter(Boolean)
+    .join("; ");
+}
+
+function causeCode(error: unknown): string {
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    if ("code" in current && typeof current.code === "string" && /^[A-Z0-9_]+$/.test(current.code)) {
+      return current.code;
+    }
+    current = "cause" in current ? current.cause : undefined;
+  }
+  return "";
 }
 
 function redactEmbedded(message: string, secret: string): string {

@@ -155,8 +155,14 @@ export async function generateCampaignMedia(input: {
   } catch (error) {
     const message = publicFalError(error, "Generation failed");
     const existing = await listCreatives(campaign.customerId, campaign.id);
-    if (existing.some((item) => item.kind === "image")) {
-      const note = `A later generate call failed (${message}). The previously stored real image is still on file.`;
+    const images = existing.filter((item) => item.kind === "image");
+    if (images.some((item) => item.provider === "fal")) {
+      const note = `A later generate call failed (${message}). The paid image already saved is still on file.`;
+      await finish(campaign, "ready", note);
+      return { status: "ready", note };
+    }
+    if (images.length > 0) {
+      const note = `${message} The picture on screen is still the local preview. No paid image was saved.`;
       await finish(campaign, "ready", note);
       return { status: "ready", note };
     }

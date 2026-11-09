@@ -7,7 +7,7 @@ import {
   imageCost,
   videoCost,
 } from "./fal-models";
-import { falKeyConfigured, publicFalError, readFalKey } from "./fal-key";
+import { falKeyProblem, publicFalError, readFalKey } from "./fal-key";
 import { isPublicMediaUrl, mediaUrls } from "./fal-service";
 import {
   attachFalRequest,
@@ -19,7 +19,8 @@ import type { GeneratedMedia } from "./provider";
 
 function configureFal() {
   const key = readFalKey();
-  if (!key || !falKeyConfigured()) throw new Error("FAL_KEY is not configured");
+  const problem = falKeyProblem(key);
+  if (problem) throw new Error(problem);
   fal.config({ credentials: key });
   return key;
 }
