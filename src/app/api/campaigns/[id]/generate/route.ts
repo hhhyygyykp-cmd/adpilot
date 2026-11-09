@@ -6,7 +6,7 @@ import { getCampaign } from "@/lib/queries/campaigns";
 import { generateCampaignMedia } from "@/lib/queries/creatives";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireCustomer(request);

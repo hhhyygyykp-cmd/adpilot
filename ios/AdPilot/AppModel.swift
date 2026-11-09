@@ -171,7 +171,7 @@ final class AppModel: ObservableObject {
                 "POST",
                 "/api/campaigns/\(id)/generate",
                 body: ["authorizePaid": authorizePaid, "video": campaign?.mediaQuote?.wantsVideo ?? false],
-                timeout: 300
+                timeout: 600
             )
             campaign = payload.campaign
             await refreshLists()

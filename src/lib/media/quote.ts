@@ -33,10 +33,15 @@ export function buildMediaQuote(input: {
   const videoRemaining = Math.max(0, PAID_VIDEO_LIMIT - paidVideoCount);
   const stillUsd = FAL_STILL_USD;
   const videoUsd = wantsVideo ? FAL_VIDEO_USD_PER_SEC * FAL_VIDEO_SECONDS : 0;
+  const chargesStill = paidImageCount === 0 && stillRemaining > 0;
+  const chargesVideo = wantsVideo && videoRemaining > 0;
+  const due = (chargesStill ? stillUsd : 0) + (chargesVideo ? videoUsd : 0);
   return {
     keyConfigured: input.keyConfigured,
     waitingForKey: !input.keyConfigured,
     wantsVideo,
+    chargesStill,
+    chargesVideo,
     still: {
       provider: "fal",
       model: FAL_STILL_MODEL,
@@ -56,7 +61,7 @@ export function buildMediaQuote(input: {
           limit: PAID_VIDEO_LIMIT,
         }
       : null,
-    totalUsd: Number((stillUsd + videoUsd).toFixed(4)),
+    totalUsd: Number(due.toFixed(4)),
   };
 }
 

@@ -213,27 +213,30 @@ async function generatePaid(input: {
   }
 
   const notes: string[] = [];
-  const claimedImage = await claimPaidSlot(campaign, "image", PAID_IMAGE_LIMIT);
+  const alreadyHasStill = (campaign.paidImageCount ?? 0) > 0;
 
-  if (claimedImage) {
-    try {
-      const still = await falGenerateStill(prompt, campaign.customerId);
-      await storeCreative({
-        campaign,
-        media: still,
-        prompt,
-        filename: `${campaign.productName || "ad"}.jpg`,
-        note: `Paid FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}). Authorized by the customer.`,
-      });
-      notes.push(`Paid still: FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}).`);
-    } catch (error) {
-      await releasePaidSlot(campaign, "image");
-      throw error;
+  if (!alreadyHasStill) {
+    const claimedImage = await claimPaidSlot(campaign, "image", PAID_IMAGE_LIMIT);
+    if (claimedImage) {
+      try {
+        const still = await falGenerateStill(prompt, campaign.customerId);
+        await storeCreative({
+          campaign,
+          media: still,
+          prompt,
+          filename: `${campaign.productName || "ad"}.jpg`,
+          note: `Paid FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}). Authorized by the customer.`,
+        });
+        notes.push(`Paid still: FLUX.1 schnell on fal (${formatUsd(quote.still.usd)}).`);
+      } catch (error) {
+        await releasePaidSlot(campaign, "image");
+        throw error;
+      }
+    } else if (!wantsVideo) {
+      const note = `Paid still limit reached (${PAID_IMAGE_LIMIT} per campaign). No extra fal image was requested.`;
+      await finish(campaign, "failed", note);
+      return { status: "failed", note };
     }
-  } else if (!wantsVideo) {
-    const note = `Paid still limit reached (${PAID_IMAGE_LIMIT} per campaign). No extra fal image was requested.`;
-    await finish(campaign, "failed", note);
-    return { status: "failed", note };
   }
 
   if (!wantsVideo) {
@@ -253,11 +256,14 @@ async function generatePaid(input: {
     video = await falGenerateVideo(videoPrompt, campaign.customerId);
   } catch (error) {
     await releasePaidSlot(campaign, "video");
-    throw error;
+    const reason = publicFalError(error, "The video service did not return a file.");
+    const note = `${notes.join(" ")} The video was not created, so the video price was not charged. ${reason}`.trim();
+    await finish(campaign, notes.length > 0 || alreadyHasStill ? "ready" : "failed", note);
+    return { status: notes.length > 0 || alreadyHasStill ? "ready" : "failed", note };
   }
   if (!("kind" in video) || video.kind !== "video" || video.mimeType !== "video/mp4") {
     await releasePaidSlot(campaign, "video");
-    const note = `${notes.join(" ")} fal did not return moving mp4, so nothing was stored as video.`;
+    const note = `${notes.join(" ")} The video file was not a moving mp4, so it was not saved and the video price was not charged.`.trim();
     await finish(campaign, "ready", note);
     return { status: "ready", note };
   }

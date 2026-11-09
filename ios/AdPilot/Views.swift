@@ -1,3 +1,4 @@
+import AVKit
 import SwiftUI
 import UIKit
 
@@ -273,17 +274,33 @@ struct CreateAdView: View {
                             }
                         }
                         if campaign.status == "confirmed", let quote = campaign.mediaQuote {
+                            let chargesVideo = quote.chargesVideo ?? (quote.video != nil)
+                            let chargesStill = quote.chargesStill ?? (quote.video == nil)
                             AppCard {
-                                Text(Copy.text("Estimate", "التقدير", language: model.language))
+                                Text(Copy.text("This tap", "هذه الضغطة", language: model.language))
                                     .font(AppFont.caption)
                                     .foregroundStyle(AppColor.accent)
                                 Text(String(format: "$%.3f", quote.totalUsd))
                                     .font(AppFont.screenTitle)
                                     .foregroundStyle(AppColor.foreground)
-                                if let still = quote.still {
+                                if chargesVideo, let video = quote.video {
+                                    Text("\(video.label) · \(video.seconds ?? 5)s · \(String(format: "$%.3f", video.usd))")
+                                        .font(AppFont.caption)
+                                        .foregroundStyle(AppColor.mutedForeground)
+                                }
+                                if chargesStill, let still = quote.still {
                                     Text("\(still.label) · \(String(format: "$%.3f", still.usd))")
                                         .font(AppFont.caption)
                                         .foregroundStyle(AppColor.mutedForeground)
+                                }
+                                if chargesVideo {
+                                    Text(Copy.text(
+                                        "The video takes a few minutes. Leave this screen open until it appears.",
+                                        "الفيديو يستغرق بضع دقائق. ابق في هذه الشاشة حتى يظهر.",
+                                        language: model.language
+                                    ))
+                                    .font(AppFont.caption)
+                                    .foregroundStyle(AppColor.mutedForeground)
                                 }
                                 if quote.waitingForKey {
                                     Text(Copy.text(
@@ -301,7 +318,9 @@ struct CreateAdView: View {
                             }
                             AppButton(
                                 authorize
-                                    ? Copy.text("Generate paid ad", "ولّد الإعلان المدفوع", language: model.language)
+                                    ? (chargesVideo && !chargesStill
+                                        ? Copy.text("Generate paid video", "ولّد الفيديو المدفوع", language: model.language)
+                                        : Copy.text("Generate paid ad", "ولّد الإعلان المدفوع", language: model.language))
                                     : Copy.text("Generate free still", "ولّد صورة مجانية", language: model.language),
                                 role: authorize ? .primary : .outline,
                                 isLoading: model.busy,
@@ -320,17 +339,17 @@ struct CreateAdView: View {
                                 .font(AppFont.caption)
                                 .foregroundStyle(AppColor.mutedForeground)
                         }
-                        ForEach(campaign.creatives) { creative in
-                            if creative.kind == "image" {
-                                CreativeImage(id: creative.id)
-                                Text(creative.note)
-                                    .font(AppFont.caption)
-                                    .foregroundStyle(AppColor.mutedForeground)
-                            } else {
-                                Text(creative.note)
-                                    .font(AppFont.caption)
-                                    .foregroundStyle(AppColor.foreground)
-                            }
+                        ForEach(campaign.creatives.filter { $0.kind == "video" }) { creative in
+                            CreativeVideo(id: creative.id)
+                            Text(creative.note)
+                                .font(AppFont.caption)
+                                .foregroundStyle(AppColor.mutedForeground)
+                        }
+                        ForEach(campaign.creatives.filter { $0.kind == "image" }) { creative in
+                            CreativeImage(id: creative.id)
+                            Text(creative.note)
+                                .font(AppFont.caption)
+                                .foregroundStyle(AppColor.mutedForeground)
                         }
                         .animation(motion, value: campaign.creatives.map(\.id))
                     }
@@ -408,6 +427,48 @@ struct CreativeImage: View {
                     try? data.write(to: url)
                     shareFile = url
                 }
+            } catch {
+                failed = true
+            }
+        }
+    }
+}
+
+struct CreativeVideo: View {
+    @EnvironmentObject private var model: AppModel
+    let id: String
+    @State private var player: AVPlayer?
+    @State private var shareFile: URL?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let player {
+                VideoPlayer(player: player)
+                    .frame(minHeight: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
+                if let file = shareFile {
+                    ShareLink(item: file) {
+                        Text(Copy.text("Share video", "شارك الفيديو", language: model.language))
+                            .font(AppFont.button)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                }
+            } else if failed {
+                Text(Copy.text("Video could not be loaded", "تعذر تحميل الفيديو", language: model.language))
+                    .font(AppFont.secondary)
+                    .foregroundStyle(AppColor.destructive)
+            } else {
+                AppSkeleton(rows: 1)
+            }
+        }
+        .task(id: id) {
+            do {
+                let data = try await model.creativeData(id)
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("adpilot-\(id).mp4")
+                try data.write(to: url, options: .atomic)
+                shareFile = url
+                player = AVPlayer(url: url)
             } catch {
                 failed = true
             }

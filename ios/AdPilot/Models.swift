@@ -128,6 +128,8 @@ struct MediaQuote: Decodable {
     var keyConfigured: Bool
     var waitingForKey: Bool
     var wantsVideo: Bool
+    var chargesStill: Bool?
+    var chargesVideo: Bool?
     var totalUsd: Double
     var still: QuoteLine?
     var video: QuoteLine?

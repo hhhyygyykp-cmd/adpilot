@@ -113,6 +113,8 @@ export type MediaQuote = {
   keyConfigured: boolean;
   waitingForKey: boolean;
   wantsVideo: boolean;
+  chargesStill: boolean;
+  chargesVideo: boolean;
   still: MediaQuoteLine;
   video: MediaQuoteLine | null;
   totalUsd: number;
