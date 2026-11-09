@@ -20,6 +20,12 @@
 		B1000000000000000000000F /* AppButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000F /* AppButton.swift */; };
 		B10000000000000000000010 /* AppTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000010 /* AppTextField.swift */; };
 		B10000000000000000000011 /* AppCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000011 /* AppCard.swift */; };
+		B10000000000000000000012 /* AppBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000012 /* AppBadge.swift */; };
+		B10000000000000000000013 /* AppSkeleton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000013 /* AppSkeleton.swift */; };
+		B10000000000000000000014 /* AppToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000014 /* AppToast.swift */; };
+		B10000000000000000000015 /* AppSwitchRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000015 /* AppSwitchRow.swift */; };
+		B10000000000000000000016 /* ChatComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000016 /* ChatComposer.swift */; };
+		B10000000000000000000017 /* AppEmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000017 /* AppEmptyState.swift */; };
 		B10000000000000000000007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000007 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -38,6 +44,12 @@
 		F1000000000000000000000F /* AppButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppButton.swift; sourceTree = "<group>"; };
 		F10000000000000000000010 /* AppTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppTextField.swift; sourceTree = "<group>"; };
 		F10000000000000000000011 /* AppCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppCard.swift; sourceTree = "<group>"; };
+		F10000000000000000000012 /* AppBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppBadge.swift; sourceTree = "<group>"; };
+		F10000000000000000000013 /* AppSkeleton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppSkeleton.swift; sourceTree = "<group>"; };
+		F10000000000000000000014 /* AppToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppToast.swift; sourceTree = "<group>"; };
+		F10000000000000000000015 /* AppSwitchRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppSwitchRow.swift; sourceTree = "<group>"; };
+		F10000000000000000000016 /* ChatComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/ChatComposer.swift; sourceTree = "<group>"; };
+		F10000000000000000000017 /* AppEmptyState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppEmptyState.swift; sourceTree = "<group>"; };
 		F10000000000000000000007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F10000000000000000000008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F10000000000000000000009 /* AdPilot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AdPilot.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -75,6 +87,12 @@
 				F1000000000000000000000F /* AppButton.swift */,
 				F10000000000000000000010 /* AppTextField.swift */,
 				F10000000000000000000011 /* AppCard.swift */,
+				F10000000000000000000012 /* AppBadge.swift */,
+				F10000000000000000000013 /* AppSkeleton.swift */,
+				F10000000000000000000014 /* AppToast.swift */,
+				F10000000000000000000015 /* AppSwitchRow.swift */,
+				F10000000000000000000016 /* ChatComposer.swift */,
+				F10000000000000000000017 /* AppEmptyState.swift */,
 				F10000000000000000000003 /* Models.swift */,
 				F10000000000000000000004 /* APIClient.swift */,
 				F10000000000000000000005 /* AppModel.swift */,
@@ -176,6 +194,12 @@
 				B1000000000000000000000F /* AppButton.swift in Sources */,
 				B10000000000000000000010 /* AppTextField.swift in Sources */,
 				B10000000000000000000011 /* AppCard.swift in Sources */,
+				B10000000000000000000012 /* AppBadge.swift in Sources */,
+				B10000000000000000000013 /* AppSkeleton.swift in Sources */,
+				B10000000000000000000014 /* AppToast.swift in Sources */,
+				B10000000000000000000015 /* AppSwitchRow.swift in Sources */,
+				B10000000000000000000016 /* ChatComposer.swift in Sources */,
+				B10000000000000000000017 /* AppEmptyState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -18,7 +18,7 @@ struct AdPilotApp: App {
 
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var alertText: String?
+    @State private var toastText: String?
 
     var body: some View {
         Group {
@@ -30,31 +30,28 @@ struct RootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppColor.background.ignoresSafeArea())
+        .overlay(alignment: .top) {
+            if let toastText, model.customer != nil, model.tab != 4 {
+                AppToast(message: toastText) {
+                    self.toastText = nil
+                    model.errorMessage = nil
+                }
+                .padding(.horizontal, AppSpacing.md)
+                .padding(.top, AppSpacing.sm)
+            }
+        }
         .onChange(of: model.errorMessage) { _, newValue in
-            guard let newValue else {
-                alertText = nil
+            guard let newValue, !newValue.isEmpty else {
+                toastText = nil
+                return
+            }
+            if model.customer == nil || model.tab == 4 {
+                toastText = nil
                 return
             }
             Keyboard.dismiss()
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 400_000_000)
-                if model.errorMessage == newValue {
-                    alertText = newValue
-                }
-            }
+            toastText = newValue
         }
-        .alert("AdPilot", isPresented: alertShown) {
-            Button("OK", role: .cancel) {
-                alertText = nil
-                model.errorMessage = nil
-            }
-        } message: {
-            Text(alertText ?? "")
-        }
-    }
-
-    private var alertShown: Binding<Bool> {
-        Binding(get: { alertText != nil }, set: { if !$0 { alertText = nil } })
     }
 }
 

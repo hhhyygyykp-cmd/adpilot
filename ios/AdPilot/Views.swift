@@ -51,6 +51,12 @@ struct AuthView: View {
                     text: $password,
                     isSecure: true
                 )
+                if let error = model.errorMessage, !error.isEmpty {
+                    Text(error)
+                        .font(AppFont.caption)
+                        .foregroundStyle(AppColor.destructive)
+                        .accessibilityLabel(error)
+                }
                 AppButton(
                     registering
                         ? Copy.text("Create account", "إنشاء الحساب", language: language)
@@ -59,6 +65,7 @@ struct AuthView: View {
                     isEnabled: canSubmit
                 ) {
                     Keyboard.dismiss()
+                    model.errorMessage = nil
                     Task {
                         if registering {
                             await model.register(name: name, email: email, password: password, language: language)
@@ -128,14 +135,17 @@ struct HomeView: View {
                     Text(Copy.text("Recent briefs", "آخر الطلبات", language: model.language))
                         .font(AppFont.caption)
                         .foregroundStyle(AppColor.mutedForeground)
-                    if model.campaigns.isEmpty {
-                        Text(Copy.text(
-                            "No ads yet. Start with a sentence about what you want to promote.",
-                            "لا إعلانات بعد. ابدأ بجملة عما تريد الترويج له.",
-                            language: model.language
-                        ))
-                        .font(AppFont.secondary)
-                        .foregroundStyle(AppColor.mutedForeground)
+                    if model.busy && model.campaigns.isEmpty {
+                        AppSkeleton(rows: 2)
+                    } else if model.campaigns.isEmpty {
+                        AppEmptyState(
+                            systemImage: "text.bubble",
+                            message: Copy.text(
+                                "No ads yet. Start with a sentence about what you want to promote.",
+                                "لا إعلانات بعد. ابدأ بجملة عما تريد الترويج له.",
+                                language: model.language
+                            )
+                        )
                     } else {
                         ForEach(Array(model.campaigns.prefix(6))) { item in
                             Button {
@@ -165,88 +175,115 @@ struct HomeView: View {
 
 struct CreateAdView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var draft = ""
     @State private var authorize = false
 
     var body: some View {
-        NavigationStack {
+        let motion: Animation? = reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.86)
+        let stillCount = model.campaign?.creatives.filter { $0.kind == "image" }.count ?? 0
+        return NavigationStack {
             ScrollView {
                 if let campaign = model.campaign {
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: AppSpacing.md) {
                         Text(campaign.title)
-                            .font(.system(size: 28, weight: .regular, design: .serif))
+                            .font(AppFont.screenTitle)
+                            .foregroundStyle(AppColor.foreground)
                         ForEach(campaign.conversation) { message in
-                            HStack {
-                                if message.role == "customer" { Spacer(minLength: 40) }
-                                Text(message.text)
-                                    .padding(12)
-                                    .background(message.role == "customer" ? AdColor.gold.opacity(0.2) : AdColor.surface)
-                                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                                if message.role != "customer" { Spacer(minLength: 40) }
-                            }
+                            ChatBubble(text: message.text, isUser: message.role == "customer")
                         }
                         if campaign.status == "drafting" {
-                            TextField(Copy.text("Type your answer…", "اكتب إجابتك…", language: model.language), text: $draft, axis: .vertical)
-                                .padding(12)
-                                .background(AdColor.surface)
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                            GoldButton(title: Copy.text("Send", "إرسال", language: model.language), enabled: !draft.trimmingCharacters(in: .whitespaces).isEmpty) {
-                                Keyboard.dismiss()
-                                let text = draft
-                                draft = ""
-                                Task { await model.sendCampaign(text: text) }
-                            }
-                            Button(Copy.text("Skip", "تخطَّ", language: model.language)) {
-                                Task { await model.sendCampaign(skip: true) }
-                            }
-                            .foregroundStyle(AdColor.muted)
-                            if campaign.productName != nil && campaign.objective != nil {
-                                Button(Copy.text("Skip remaining", "تخطَّ الباقي", language: model.language)) {
-                                    Task { await model.sendCampaign(skipRemaining: true) }
+                            ChatComposer(
+                                text: $draft,
+                                placeholder: Copy.text("Type your answer…", "اكتب إجابتك…", language: model.language),
+                                sendTitle: Copy.text("Send", "إرسال", language: model.language),
+                                skipTitle: Copy.text("Skip", "تخطَّ", language: model.language),
+                                skipRemainingTitle: Copy.text("Skip remaining", "تخطَّ الباقي", language: model.language),
+                                showsSkipRemaining: campaign.productName != nil && campaign.objective != nil,
+                                onSend: {
+                                    Keyboard.dismiss()
+                                    let text = draft
+                                    draft = ""
+                                    Task {
+                                        model.errorMessage = nil
+                                        await model.sendCampaign(text: text)
+                                        AppHaptic.notify(success: model.errorMessage == nil)
+                                    }
+                                },
+                                onSkip: {
+                                    Task {
+                                        model.errorMessage = nil
+                                        await model.sendCampaign(skip: true)
+                                        AppHaptic.notify(success: model.errorMessage == nil)
+                                    }
+                                },
+                                onSkipRemaining: {
+                                    Task {
+                                        model.errorMessage = nil
+                                        await model.sendCampaign(skipRemaining: true)
+                                        AppHaptic.notify(success: model.errorMessage == nil)
+                                    }
                                 }
-                                .foregroundStyle(AdColor.gold)
-                            }
+                            )
                         }
                         if let set = campaign.conceptSet, campaign.status != "drafting" {
                             Text(set.recommendationReason)
-                                .font(.subheadline)
-                                .foregroundStyle(AdColor.muted)
+                                .font(AppFont.secondary)
+                                .foregroundStyle(AppColor.mutedForeground)
                             ForEach(set.concepts) { concept in
                                 Button {
                                     Task { await model.chooseConcept(id: concept.id, recommended: false) }
                                 } label: {
-                                    Panel {
-                                        Text(concept.title).font(.headline).foregroundStyle(AdColor.cream)
-                                        Text(concept.hook).foregroundStyle(AdColor.cream)
-                                        Text(concept.coreMessage).font(.caption).foregroundStyle(AdColor.muted)
+                                    AppCard {
+                                        Text(concept.title)
+                                            .font(AppFont.section)
+                                            .foregroundStyle(AppColor.foreground)
+                                        Text(concept.hook)
+                                            .font(AppFont.body)
+                                            .foregroundStyle(AppColor.foreground)
+                                        Text(concept.coreMessage)
+                                            .font(AppFont.caption)
+                                            .foregroundStyle(AppColor.mutedForeground)
                                         if set.selectedId == concept.id {
-                                            Text(Copy.text("Selected", "مختار", language: model.language))
-                                                .font(.caption)
-                                                .foregroundStyle(AdColor.gold)
+                                            AppBadge(
+                                                title: Copy.text("Selected", "مختار", language: model.language),
+                                                tone: .positive
+                                            )
                                         }
                                     }
                                 }
+                                .accessibilityHint(Copy.text("Selects this concept", "يختار هذا الاتجاه", language: model.language))
                             }
-                            GoldButton(title: Copy.text("Use recommended", "استخدم المقترح", language: model.language)) {
+                            .animation(motion, value: set.concepts.map(\.id))
+                            AppButton(Copy.text("Use recommended", "استخدم المقترح", language: model.language), role: .secondary) {
                                 Task { await model.chooseConcept(id: nil, recommended: true) }
                             }
+                            .accessibilityHint(Copy.text("Uses the recommended concept", "يستخدم الاتجاه المقترح", language: model.language))
                         }
                         if campaign.status == "brief_ready" {
-                            GoldButton(title: Copy.text("Confirm brief and concept", "أكّد الملخص والاتجاه", language: model.language), enabled: campaign.conceptSet?.selectedId != nil) {
-                                Task { await model.confirmCampaign() }
+                            AppButton(
+                                Copy.text("Confirm brief and concept", "أكّد الملخص والاتجاه", language: model.language),
+                                isEnabled: campaign.conceptSet?.selectedId != nil
+                            ) {
+                                Task {
+                                    model.errorMessage = nil
+                                    await model.confirmCampaign()
+                                    AppHaptic.notify(success: model.errorMessage == nil)
+                                }
                             }
                         }
                         if campaign.status == "confirmed", let quote = campaign.mediaQuote {
-                            Panel {
+                            AppCard {
                                 Text(Copy.text("Estimate", "التقدير", language: model.language))
-                                    .font(.caption)
-                                    .foregroundStyle(AdColor.gold)
+                                    .font(AppFont.caption)
+                                    .foregroundStyle(AppColor.accent)
                                 Text(String(format: "$%.3f", quote.totalUsd))
-                                    .font(.title2)
+                                    .font(AppFont.screenTitle)
+                                    .foregroundStyle(AppColor.foreground)
                                 if let still = quote.still {
                                     Text("\(still.label) · \(String(format: "$%.3f", still.usd))")
-                                        .font(.caption)
-                                        .foregroundStyle(AdColor.muted)
+                                        .font(AppFont.caption)
+                                        .foregroundStyle(AppColor.mutedForeground)
                                 }
                                 if quote.waitingForKey {
                                     Text(Copy.text(
@@ -254,56 +291,78 @@ struct CreateAdView: View {
                                         "الصور المدفوعة تنتظر مفتاح fal على الخادم. الصورة المجانية متاحة بدون تفويض.",
                                         language: model.language
                                     ))
-                                    .font(.caption)
-                                    .foregroundStyle(AdColor.muted)
+                                    .font(AppFont.caption)
+                                    .foregroundStyle(AppColor.mutedForeground)
                                 }
-                                Toggle(Copy.text("Authorize this paid generation", "أفوض هذا التوليد المدفوع", language: model.language), isOn: $authorize)
+                                AppSwitchRow(
+                                    title: Copy.text("Authorize this paid generation", "أفوض هذا التوليد المدفوع", language: model.language),
+                                    isOn: $authorize
+                                )
                             }
-                            GoldButton(
-                                title: authorize
+                            AppButton(
+                                authorize
                                     ? Copy.text("Generate paid ad", "ولّد الإعلان المدفوع", language: model.language)
                                     : Copy.text("Generate free still", "ولّد صورة مجانية", language: model.language),
-                                enabled: !model.busy
+                                role: authorize ? .primary : .outline,
+                                isLoading: model.busy,
+                                isEnabled: !model.busy
                             ) {
-                                Task { await model.generate(authorizePaid: authorize) }
+                                let paid = authorize
+                                Task {
+                                    model.errorMessage = nil
+                                    await model.generate(authorizePaid: paid)
+                                    AppHaptic.notify(success: model.errorMessage == nil)
+                                }
                             }
                         }
                         if !campaign.generationNote.isEmpty {
                             Text(campaign.generationNote)
-                                .font(.footnote)
-                                .foregroundStyle(AdColor.muted)
+                                .font(AppFont.caption)
+                                .foregroundStyle(AppColor.mutedForeground)
                         }
                         ForEach(campaign.creatives) { creative in
                             if creative.kind == "image" {
                                 CreativeImage(id: creative.id)
-                                Text(creative.note).font(.caption2).foregroundStyle(AdColor.muted)
+                                Text(creative.note)
+                                    .font(AppFont.caption)
+                                    .foregroundStyle(AppColor.mutedForeground)
                             } else {
-                                Text(creative.note).font(.caption).foregroundStyle(AdColor.cream)
+                                Text(creative.note)
+                                    .font(AppFont.caption)
+                                    .foregroundStyle(AppColor.foreground)
                             }
                         }
+                        .animation(motion, value: campaign.creatives.map(\.id))
                     }
-                    .padding(20)
+                    .padding(AppSpacing.lg)
+                    .onChange(of: campaign.id) { _, _ in
+                        authorize = false
+                    }
+                    .onChange(of: stillCount) { oldCount, newCount in
+                        guard newCount > oldCount else { return }
+                        UIAccessibility.post(
+                            notification: .announcement,
+                            argument: Copy.text("Still ready", "الصورة جاهزة", language: model.language)
+                        )
+                    }
                 } else {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(Copy.text("Create Ad", "إنشاء إعلان", language: model.language))
-                            .font(.system(size: 32, weight: .regular, design: .serif))
-                        Text(Copy.text(
+                    AppEmptyState(
+                        systemImage: "plus.circle",
+                        message: Copy.text(
                             "Start from Home with a sentence about what you want to promote.",
                             "ابدأ من الرئيسية بجملة عما تريد الترويج له.",
                             language: model.language
-                        ))
-                        .foregroundStyle(AdColor.muted)
-                        GoldButton(title: Copy.text("Go to Home", "إلى الرئيسية", language: model.language)) {
-                            Keyboard.dismiss()
-                            model.tab = 0
-                        }
+                        ),
+                        actionTitle: Copy.text("Go to Home", "إلى الرئيسية", language: model.language)
+                    ) {
+                        Keyboard.dismiss()
+                        model.tab = 0
                     }
-                    .padding(20)
+                    .padding(AppSpacing.lg)
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(AdColor.ink)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .background(AppColor.background)
             .navigationTitle(Copy.text("Create Ad", "إنشاء إعلان", language: model.language))
         }
     }
@@ -322,17 +381,21 @@ struct CreativeImage: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
                 if let file = shareFile {
                     ShareLink(item: file) {
                         Text(Copy.text("Share", "مشاركة", language: model.language))
+                            .font(AppFont.button)
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
+                    .accessibilityLabel(Copy.text("Share", "مشاركة", language: model.language))
                 }
             } else if failed {
                 Text(Copy.text("Image could not be loaded", "تعذر تحميل الصورة", language: model.language))
-                    .foregroundStyle(AdColor.danger)
+                    .font(AppFont.secondary)
+                    .foregroundStyle(AppColor.destructive)
             } else {
-                ProgressView()
+                AppSkeleton(rows: 1)
             }
         }
         .task(id: id) {
@@ -354,31 +417,50 @@ struct CreativeImage: View {
 
 struct AdsView: View {
     @EnvironmentObject private var model: AppModel
+    @State private var isLoading = true
 
     var body: some View {
         NavigationStack {
-            List(model.campaigns) { item in
-                Button {
-                    Task { await model.openCampaign(item.id) }
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.title).foregroundStyle(AdColor.cream)
-                        Text(status(item.status)).font(.caption).foregroundStyle(AdColor.gold)
+            Group {
+                if isLoading && model.campaigns.isEmpty {
+                    AppSkeleton()
+                        .padding(AppSpacing.lg)
+                } else if model.campaigns.isEmpty {
+                    AppEmptyState(
+                        systemImage: "photo.on.rectangle",
+                        message: Copy.text("No saved briefs yet.", "لا ملخصات محفوظة بعد.", language: model.language),
+                        actionTitle: Copy.text("Start from Home", "ابدأ من الرئيسية", language: model.language)
+                    ) {
+                        model.tab = 0
                     }
+                } else {
+                    List(model.campaigns) { item in
+                        Button {
+                            Task { await model.openCampaign(item.id) }
+                        } label: {
+                            VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                                Text(item.title)
+                                    .font(AppFont.body)
+                                    .foregroundStyle(AppColor.foreground)
+                                AppBadge(title: status(item.status), tone: tone(item.status))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(minHeight: 44)
+                        }
+                        .accessibilityHint(Copy.text("Opens this brief", "يفتح هذا الطلب", language: model.language))
+                        .listRowBackground(AppColor.card)
+                    }
+                    .scrollContentBackground(.hidden)
                 }
-                .listRowBackground(AdColor.surface)
             }
-            .scrollContentBackground(.hidden)
-            .background(AdColor.ink)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(AppColor.background)
             .navigationTitle(Copy.text("My Ads", "إعلاناتي", language: model.language))
-            .overlay {
-                if model.campaigns.isEmpty {
-                    Text(Copy.text("No saved briefs yet.", "لا ملخصات محفوظة بعد.", language: model.language))
-                        .foregroundStyle(AdColor.muted)
-                }
+            .task {
+                isLoading = true
+                await model.refreshLists()
+                isLoading = false
             }
-            .task { await model.refreshLists() }
         }
     }
 
@@ -390,47 +472,73 @@ struct AdsView: View {
         default: return value
         }
     }
+
+    private func tone(_ value: String) -> AppBadgeTone {
+        switch value {
+        case "brief_ready": return .accent
+        case "confirmed": return .positive
+        default: return .neutral
+        }
+    }
 }
 
 struct BusinessTab: View {
     @EnvironmentObject private var model: AppModel
+    @State private var isLoading = true
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(model.businesses) { business in
-                    NavigationLink {
-                        BusinessChat(businessId: business.id)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(business.name.isEmpty ? Copy.text("New business", "عمل جديد", language: model.language) : business.name)
-                                .foregroundStyle(AdColor.cream)
-                            if business.isActive {
-                                Text(Copy.text("Active", "نشط", language: model.language))
-                                    .font(.caption)
-                                    .foregroundStyle(AdColor.gold)
+            Group {
+                if isLoading && model.businesses.isEmpty {
+                    AppSkeleton()
+                        .padding(AppSpacing.lg)
+                } else if model.businesses.isEmpty {
+                    AppEmptyState(
+                        systemImage: "building.2",
+                        message: Copy.text("No businesses yet.", "لا أعمال بعد.", language: model.language),
+                        actionTitle: Copy.text("Add", "إضافة", language: model.language)
+                    ) {
+                        Task { _ = await model.startBusiness() }
+                    }
+                } else {
+                    List {
+                        ForEach(model.businesses) { business in
+                            NavigationLink {
+                                BusinessChat(businessId: business.id)
+                            } label: {
+                                VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                                    Text(business.name.isEmpty ? Copy.text("New business", "عمل جديد", language: model.language) : business.name)
+                                        .font(AppFont.body)
+                                        .foregroundStyle(AppColor.foreground)
+                                    if business.isActive {
+                                        AppBadge(
+                                            title: Copy.text("Active", "نشط", language: model.language),
+                                            tone: .accent
+                                        )
+                                    }
+                                }
+                                .frame(minHeight: 44, alignment: .leading)
                             }
+                            .listRowBackground(AppColor.card)
                         }
                     }
-                    .listRowBackground(AdColor.surface)
+                    .scrollContentBackground(.hidden)
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(AdColor.ink)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(AppColor.background)
             .navigationTitle(Copy.text("My Business", "أعمالي", language: model.language))
             .toolbar {
                 Button(Copy.text("Add", "إضافة", language: model.language)) {
                     Task { _ = await model.startBusiness() }
                 }
+                .frame(minWidth: 44, minHeight: 44)
             }
-            .overlay {
-                if model.businesses.isEmpty {
-                    Text(Copy.text("No businesses yet.", "لا أعمال بعد.", language: model.language))
-                        .foregroundStyle(AdColor.muted)
-                }
+            .task {
+                isLoading = true
+                await model.refreshLists()
+                isLoading = false
             }
-            .task { await model.refreshLists() }
         }
     }
 }
@@ -443,52 +551,58 @@ struct BusinessChat: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: AppSpacing.md) {
                 if let business {
                     Text(business.name.isEmpty ? Copy.text("New business", "عمل جديد", language: model.language) : business.name)
-                        .font(.title.weight(.regular))
-                        .foregroundStyle(AdColor.cream)
+                        .font(AppFont.screenTitle)
+                        .foregroundStyle(AppColor.foreground)
                     if !business.isActive {
-                        GoldButton(title: Copy.text("Use for ads", "استخدمه للإعلانات", language: model.language)) {
+                        AppButton(Copy.text("Use for ads", "استخدمه للإعلانات", language: model.language)) {
                             Task {
+                                model.errorMessage = nil
                                 await model.activateBusiness(business.id)
                                 await reload()
+                                AppHaptic.notify(success: model.errorMessage == nil)
                             }
                         }
                     }
                     ForEach(business.onboardingState.messages) { message in
-                        Text(message.text)
-                            .padding(12)
-                            .frame(maxWidth: .infinity, alignment: message.role == "customer" ? .trailing : .leading)
-                            .background(AdColor.surface)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        ChatBubble(text: message.text, isUser: message.role == "customer")
                     }
                     if !business.onboardingComplete {
-                        TextField(Copy.text("Your answer", "إجابتك", language: model.language), text: $draft, axis: .vertical)
-                            .padding(12)
-                            .background(AdColor.surface)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                        GoldButton(title: Copy.text("Send", "إرسال", language: model.language), enabled: !draft.trimmingCharacters(in: .whitespaces).isEmpty) {
-                            Keyboard.dismiss()
-                            let text = draft
-                            draft = ""
-                            Task { await send(text: text) }
-                        }
-                        if !business.name.isEmpty {
-                            Button(Copy.text("Skip remaining", "تخطَّ الباقي", language: model.language)) {
-                                Task { await send(skipRemaining: true) }
+                        ChatComposer(
+                            text: $draft,
+                            placeholder: Copy.text("Your answer", "إجابتك", language: model.language),
+                            sendTitle: Copy.text("Send", "إرسال", language: model.language),
+                            skipRemainingTitle: Copy.text("Skip remaining", "تخطَّ الباقي", language: model.language),
+                            showsSkipRemaining: !business.name.isEmpty,
+                            onSend: {
+                                Keyboard.dismiss()
+                                let text = draft
+                                draft = ""
+                                Task {
+                                    model.errorMessage = nil
+                                    await send(text: text)
+                                    AppHaptic.notify(success: model.errorMessage == nil)
+                                }
+                            },
+                            onSkipRemaining: {
+                                Task {
+                                    model.errorMessage = nil
+                                    await send(skipRemaining: true)
+                                    AppHaptic.notify(success: model.errorMessage == nil)
+                                }
                             }
-                            .foregroundStyle(AdColor.gold)
-                        }
+                        )
                     }
                 } else {
-                    ProgressView()
+                    AppSkeleton(rows: 4)
                 }
             }
-            .padding(20)
+            .padding(AppSpacing.lg)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(AdColor.ink)
+        .background(AppColor.background)
         .task { await reload() }
     }
 
@@ -512,54 +626,73 @@ struct AccountView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: AppSpacing.md) {
                     Text(model.customer?.email ?? "")
-                        .foregroundStyle(AdColor.muted)
-                    TextField(Copy.text("Your name", "اسمك", language: model.language), text: $name)
-                        .padding(14)
-                        .background(AdColor.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                    GoldButton(title: Copy.text("Save name", "احفظ الاسم", language: model.language)) {
-                        Task { await model.saveProfile(name: name) }
+                        .font(AppFont.secondary)
+                        .foregroundStyle(AppColor.mutedForeground)
+                    if let error = model.errorMessage, !error.isEmpty {
+                        Text(error)
+                            .font(AppFont.caption)
+                            .foregroundStyle(AppColor.destructive)
+                            .accessibilityLabel(error)
+                    }
+                    AppTextField(
+                        label: Copy.text("Your name", "اسمك", language: model.language),
+                        text: $name
+                    )
+                    AppButton(Copy.text("Save name", "احفظ الاسم", language: model.language)) {
+                        Task {
+                            model.errorMessage = nil
+                            await model.saveProfile(name: name)
+                            AppHaptic.notify(success: model.errorMessage == nil)
+                        }
                     }
                     Picker(Copy.text("Language", "اللغة", language: model.language), selection: language) {
                         Text("English").tag("en")
                         Text("العربية").tag("ar")
                     }
-                    SecureField(Copy.text("Current password", "كلمة المرور الحالية", language: model.language), text: $currentPassword)
-                        .padding(14)
-                        .background(AdColor.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                    SecureField(Copy.text("New password", "كلمة المرور الجديدة", language: model.language), text: $newPassword)
-                        .padding(14)
-                        .background(AdColor.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                    GoldButton(title: Copy.text("Change password", "غيّر كلمة المرور", language: model.language), enabled: newPassword.count >= 8) {
+                    .frame(minHeight: 44)
+                    AppTextField(
+                        label: Copy.text("Current password", "كلمة المرور الحالية", language: model.language),
+                        text: $currentPassword,
+                        isSecure: true
+                    )
+                    AppTextField(
+                        label: Copy.text("New password", "كلمة المرور الجديدة", language: model.language),
+                        text: $newPassword,
+                        isSecure: true
+                    )
+                    AppButton(
+                        Copy.text("Change password", "غيّر كلمة المرور", language: model.language),
+                        isEnabled: newPassword.count >= 8
+                    ) {
                         Task {
+                            model.errorMessage = nil
                             await model.changePassword(current: currentPassword, new: newPassword)
-                            currentPassword = ""
-                            newPassword = ""
+                            if model.errorMessage == nil {
+                                currentPassword = ""
+                                newPassword = ""
+                                AppHaptic.notify(success: true)
+                            } else {
+                                AppHaptic.notify(success: false)
+                            }
                         }
                     }
-                    Button(Copy.text("Sign out", "تسجيل الخروج", language: model.language)) {
+                    AppButton(Copy.text("Sign out", "تسجيل الخروج", language: model.language), role: .ghost) {
                         Task { await model.logout() }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .foregroundStyle(AdColor.muted)
                     Text(Copy.text(
                         "Instagram and Facebook publishing, and live ad analytics, are not in this version.",
                         "نشر إنستغرام وفيسبوك وتحليلات الإعلانات المباشرة ليست في هذا الإصدار.",
                         language: model.language
                     ))
-                    .font(.caption)
-                    .foregroundStyle(AdColor.muted)
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.mutedForeground)
                 }
-                .padding(20)
+                .padding(AppSpacing.lg)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(AdColor.ink)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .background(AppColor.background)
             .navigationTitle(Copy.text("Account", "الحساب", language: model.language))
             .onAppear { name = model.customer?.name ?? "" }
         }
@@ -568,7 +701,13 @@ struct AccountView: View {
     private var language: Binding<String> {
         Binding(
             get: { model.language },
-            set: { value in Task { await model.saveLanguage(value) } }
+            set: { value in
+                Task {
+                    model.errorMessage = nil
+                    await model.saveLanguage(value)
+                    AppHaptic.notify(success: model.errorMessage == nil)
+                }
+            }
         )
     }
 }
