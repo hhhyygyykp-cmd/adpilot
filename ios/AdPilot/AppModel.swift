@@ -16,8 +16,9 @@ final class AppModel: ObservableObject {
     var language: String { customer?.preferredLanguage ?? "en" }
 
     func restore() async {
-        guard let saved = Keychain.token else { return }
-        api.token = saved
+        guard let saved = Keychain.session else { return }
+        api.token = saved.token
+        api.csrf = saved.csrf
         do {
             let me: MePayload = try await api.send("GET", "/api/auth/me")
             customer = me.customer
@@ -222,12 +223,13 @@ final class AppModel: ObservableObject {
         defer { busy = false }
         do {
             let payload: AuthPayload = try await api.send(method, path, body: body)
-            guard let token = payload.token, !token.isEmpty else {
+            guard let token = payload.token, let csrf = payload.csrf, !token.isEmpty, !csrf.isEmpty else {
                 errorMessage = "The server did not start a phone session."
                 return
             }
             api.token = token
-            Keychain.token = token
+            api.csrf = csrf
+            Keychain.session = StoredSession(token: token, csrf: csrf)
             customer = payload.customer
             await refreshLists()
         } catch {
@@ -237,7 +239,8 @@ final class AppModel: ObservableObject {
 
     private func signOutLocal() {
         api.token = nil
-        Keychain.token = nil
+        api.csrf = nil
+        Keychain.session = nil
         customer = nil
         businesses = []
         campaigns = []
@@ -246,11 +249,16 @@ final class AppModel: ObservableObject {
     }
 }
 
+struct StoredSession: Codable {
+    var token: String
+    var csrf: String
+}
+
 enum Keychain {
     private static let service = "app.adpilot.ios"
     private static let account = "session"
 
-    static var token: String? {
+    static var session: StoredSession? {
         get {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
@@ -261,9 +269,8 @@ enum Keychain {
             ]
             var item: CFTypeRef?
             guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-                  let data = item as? Data,
-                  let value = String(data: data, encoding: .utf8) else { return nil }
-            return value
+                  let data = item as? Data else { return nil }
+            return try? JSONDecoder().decode(StoredSession.self, from: data)
         }
         set {
             let base: [String: Any] = [
@@ -272,7 +279,7 @@ enum Keychain {
                 kSecAttrAccount as String: account,
             ]
             SecItemDelete(base as CFDictionary)
-            guard let newValue, let data = newValue.data(using: .utf8) else { return }
+            guard let newValue, let data = try? JSONEncoder().encode(newValue) else { return }
             var query = base
             query[kSecValueData as String] = data
             SecItemAdd(query as CFDictionary, nil)

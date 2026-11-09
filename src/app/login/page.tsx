@@ -7,6 +7,7 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { Mark } from "@/components/shell";
 import { useSession } from "@/components/providers";
 import { api } from "@/lib/api-client";
+import { safeNextPath } from "@/lib/safe-path";
 
 function LoginForm() {
   const { t, refresh } = useSession();
@@ -27,7 +28,7 @@ function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
       await refresh();
-      router.replace(params.get("next") || "/");
+      router.replace(safeNextPath(params.get("next")));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     } finally {

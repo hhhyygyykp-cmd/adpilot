@@ -55,7 +55,7 @@ export const en = {
     confirm: "Confirm brief and concept",
     confirmed: "Brief and concept saved",
     generationOff:
-      "Confirm the brief and a concept, then review the fal.ai estimate. Paid stills and video run only after you authorize. If FAL_KEY is missing, a free Pollinations still is available.",
+      "Confirm the brief and a concept, then review the fal.ai estimate. Paid stills and video run only after you authorize. If FAL_KEY is missing, AdPilot stores a local preview and does not send the brief to an outside image service.",
     interpreterStructured: "Interpreted from your words (structured conversation engine).",
     interpreterLlm: "Interpreted with the configured language model, then checked against your words.",
     needBusiness: "Choose or create a business before writing an ad.",
@@ -206,9 +206,9 @@ export const en = {
     left: "left this campaign",
     authorize: "I authorize this fal.ai spend of about",
     waitingKey:
-      "FAL_KEY is not on the server yet. The estimate is shown and we wait. No paid still or video will be faked. You can generate a free Pollinations still.",
+      "FAL_KEY is not on the server yet. The estimate is shown and we wait. No paid still or video will be faked. A free still is drawn on AdPilot and is not sent out.",
     freeNote:
-      "Paid FLUX.1 schnell and Hailuo on fal run only after you authorize. Pollinations is the free still fallback when FAL_KEY is unset. Slideshows are never labeled as video.",
+      "Paid FLUX.1 schnell and Hailuo on fal run only after you authorize. The free still stays on AdPilot. Slideshows are never labeled as video.",
   },
   common: {
     loading: "Loading…",

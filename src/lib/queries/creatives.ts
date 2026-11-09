@@ -3,8 +3,9 @@ import "server-only";
 import { newId } from "../crypto";
 import { parseJson, sql } from "../db";
 import { falGenerateStill, falGenerateVideo } from "../media/fal";
+import { localPreviewStill } from "../media/local-still";
 import { buildImagePrompt, buildVideoPrompt } from "../media/prompt";
-import { PollinationsProvider, type GeneratedMedia } from "../media/provider";
+import type { GeneratedMedia } from "../media/provider";
 import {
   PAID_IMAGE_LIMIT,
   PAID_VIDEO_LIMIT,
@@ -132,17 +133,22 @@ export async function generateCampaignMedia(input: {
       await finish(campaign, "not_started", note);
       return { status: "not_started", note };
     }
-    const image = await new PollinationsProvider().generateImage(prompt);
+    const image: GeneratedMedia = {
+      buffer: localPreviewStill(),
+      mimeType: "image/png",
+      provider: "local",
+      kind: "image",
+    };
     await storeCreative({
       campaign,
       media: image,
       prompt,
-      filename: `${campaign.productName || "ad"}.jpg`,
-      note: "Real generated image from the free Pollinations fallback. FAL_KEY is unset. Not a paid fal still.",
+      filename: `${campaign.productName || "ad"}.png`,
+      note: "Local preview still. The brief stayed on AdPilot and was not sent to an outside image service.",
     });
     const note = wantsVideo
-      ? `Free Pollinations still stored. Paid Hailuo video is waiting for FAL_KEY and authorization. Nothing was labeled as video.`
-      : `Free Pollinations still stored. FAL_KEY is unset, so paid FLUX.1 schnell was not called.`;
+      ? "Local preview still stored. Paid video waits for FAL_KEY and your authorization. Nothing was labeled as video."
+      : "Local preview still stored. The brief was not sent to an outside image service. Paid fal stills run only after you authorize.";
     await finish(campaign, "ready", note);
     return { status: "ready", note };
   } catch (error) {

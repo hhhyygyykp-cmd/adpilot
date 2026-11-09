@@ -1,15 +1,15 @@
 import { findValidInvite, redeemInvite } from "@/lib/admin";
 import { audit } from "@/lib/audit";
-import { createCustomer, createSession, findCustomerByEmail, isIosClient, validEmail, validPassword } from "@/lib/auth";
+import { createCustomer, createSession, findCustomerByEmail, validEmail, validPassword } from "@/lib/auth";
 import { sha256 } from "@/lib/crypto";
-import { errorJson, json, readJson, sameOrigin, setLangCookie } from "@/lib/http";
+import { errorJson, isBrowserRequest, json, readJson, sameOrigin, setLangCookie } from "@/lib/http";
 import { isLanguage } from "@/lib/i18n";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!sameOrigin(request) && !isIosClient(request)) return errorJson("Forbidden origin", 403);
+  if (isBrowserRequest(request) && !sameOrigin(request)) return errorJson("Forbidden origin", 403);
   const limited = rateLimit(clientKey(request, "register"), 8, 15 * 60 * 1000);
   if (!limited.ok) {
     return errorJson("Too many attempts. Try again shortly.", 429);
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   return json(
     {
       customer,
-      ...(isIosClient(request) ? { token: session.token } : {}),
+      ...(!isBrowserRequest(request) ? { token: session.token, csrf: session.csrf } : {}),
     },
     201,
   );

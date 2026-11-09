@@ -1,14 +1,21 @@
-import { bearerToken, destroySession, isIosClient, readSession } from "@/lib/auth";
+import { bearerToken, destroySession, readSession } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { errorJson, json, sameOrigin } from "@/lib/http";
+import { safeEqual } from "@/lib/crypto";
+import { errorJson, isBrowserRequest, json, sameOrigin } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!sameOrigin(request) && !isIosClient(request) && !bearerToken(request)) {
-    return errorJson("Forbidden origin", 403);
+  const browser = isBrowserRequest(request);
+  if (browser && !sameOrigin(request)) return errorJson("Forbidden origin", 403);
+  if (!browser && !bearerToken(request)) return errorJson("Please sign in", 401);
+  const auth = await readSession(browser ? undefined : request);
+  if (auth) {
+    const header = request.headers.get("x-csrf-token") ?? "";
+    if (!header || !safeEqual(header, auth.session.csrf_token)) {
+      return errorJson("Invalid security token", 403);
+    }
   }
-  const auth = await readSession(request);
   await destroySession(request);
   if (auth) {
     await audit({

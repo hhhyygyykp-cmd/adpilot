@@ -191,7 +191,7 @@ export function generateImageRefused(): ToolErr {
     tool: "generate_image",
     ok: false,
     error:
-      "Call POST /api/campaigns/:id/generate after confirm. Paid fal stills need an explicit authorize. Pollinations is the free still fallback when FAL_KEY is unset.",
+      "Call POST /api/campaigns/:id/generate after confirm. Paid fal stills need an explicit authorize. The free still is drawn on AdPilot and is not sent to an outside image service.",
   };
 }
 

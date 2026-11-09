@@ -73,6 +73,15 @@ function requestHostnames(request: Request): Set<string> {
   return hosts;
 }
 
+export function isBrowserRequest(request: Request): boolean {
+  return Boolean(
+    request.headers.get("origin") ||
+      request.headers.get("sec-fetch-site") ||
+      request.headers.get("sec-fetch-mode") ||
+      request.headers.get("sec-fetch-dest"),
+  );
+}
+
 export function sameOrigin(request: Request): boolean {
   const method = request.method.toUpperCase();
   const site = (request.headers.get("sec-fetch-site") ?? "").toLowerCase();

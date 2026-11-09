@@ -1,12 +1,12 @@
-import { authenticate, createSession, isIosClient } from "@/lib/auth";
+import { authenticate, createSession } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { errorJson, json, readJson, sameOrigin, setLangCookie } from "@/lib/http";
+import { errorJson, isBrowserRequest, json, readJson, sameOrigin, setLangCookie } from "@/lib/http";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!sameOrigin(request) && !isIosClient(request)) return errorJson("Forbidden origin", 403);
+  if (isBrowserRequest(request) && !sameOrigin(request)) return errorJson("Forbidden origin", 403);
   const body = await readJson<{ email?: string; password?: string }>(request);
   const email = (body?.email ?? "").trim().toLowerCase();
   const limited = rateLimit(clientKey(request, `login:${email}`), 8, 15 * 60 * 1000);
@@ -23,6 +23,6 @@ export async function POST(request: Request) {
   });
   return json({
     customer,
-    ...(isIosClient(request) ? { token: session.token } : {}),
+    ...(!isBrowserRequest(request) ? { token: session.token, csrf: session.csrf } : {}),
   });
 }

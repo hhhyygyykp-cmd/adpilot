@@ -652,7 +652,7 @@ export async function confirmCampaign(customerId: string, campaign: Campaign, bu
     message("customer", "Confirm brief"),
     message(
       "agent",
-      `The brief, marketing plan, and “${picked?.title ?? "selected"}” concept are stored. Review the fal.ai estimate, then authorize if you want a paid still or video. If FAL_KEY is not on the server, a free Pollinations still is available and paid calls wait.`,
+      `The brief, marketing plan, and “${picked?.title ?? "selected"}” concept are stored. Review the fal.ai estimate, then authorize if you want a paid still or video. If FAL_KEY is not on the server, a local preview still is available and the brief is not sent out.`,
     ),
   ];
   const saved = await persist({

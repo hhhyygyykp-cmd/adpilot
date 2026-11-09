@@ -37,7 +37,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       status: result.status,
       note: result.note,
       authorizePaid,
-      provider: authorizePaid ? "fal" : "pollinations",
+      provider: authorizePaid ? "fal" : "local",
     },
   });
   return json({ campaign: updated, generation: result });

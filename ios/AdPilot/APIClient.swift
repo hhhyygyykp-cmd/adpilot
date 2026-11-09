@@ -13,6 +13,7 @@ enum APIError: LocalizedError {
 struct APIClient {
     var baseURL = URL(string: "https://adpilot.apps.grok.bot")!
     var token: String?
+    var csrf: String?
 
     func send<T: Decodable>(
         _ method: String,
@@ -36,10 +37,12 @@ struct APIClient {
     ) async throws -> Data {
         var request = URLRequest(url: endpoint(path), timeoutInterval: timeout)
         request.httpMethod = method
-        request.setValue("ios", forHTTPHeaderField: "X-AdPilot-Client")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let token, !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        if let csrf, !csrf.isEmpty {
+            request.setValue(csrf, forHTTPHeaderField: "X-CSRF-Token")
         }
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

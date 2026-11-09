@@ -12,6 +12,7 @@ struct Customer: Decodable, Identifiable, Equatable {
 struct AuthPayload: Decodable {
     var customer: Customer
     var token: String?
+    var csrf: String?
 }
 
 struct MePayload: Decodable {

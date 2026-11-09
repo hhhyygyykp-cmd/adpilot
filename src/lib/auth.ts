@@ -9,6 +9,7 @@ import {
   cookieOptions,
   CSRF_COOKIE,
   errorJson,
+  isBrowserRequest,
   SESSION_COOKIE,
   sameOrigin,
 } from "./http";
@@ -74,10 +75,6 @@ export async function authenticate(email: string, password: string) {
   const ok = await verifyPassword(password, row.password_hash);
   if (!ok) return null;
   return mapCustomer(row);
-}
-
-export function isIosClient(request: Request): boolean {
-  return request.headers.get("x-adpilot-client") === "ios";
 }
 
 export function bearerToken(request: Request): string | null {
@@ -162,25 +159,22 @@ export async function readSession(request?: Request): Promise<{
 }
 
 export async function requireCustomer(request: Request) {
-  if (bearerToken(request)) {
-    const auth = await readSession(request);
-    if (!auth) return { error: errorJson("Please sign in", 401) as Response };
-    return { customer: auth.customer, session: auth.session };
+  const browser = isBrowserRequest(request);
+  if (!browser && !bearerToken(request)) {
+    return { error: errorJson("Please sign in", 401) as Response };
   }
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    if (!sameOrigin(request)) {
-      return { error: errorJson("Forbidden origin", 403) as Response };
-    }
-    const auth = await readSession();
-    if (!auth) return { error: errorJson("Please sign in", 401) as Response };
+  const writing = request.method !== "GET" && request.method !== "HEAD";
+  if (writing && browser && !sameOrigin(request)) {
+    return { error: errorJson("Forbidden origin", 403) as Response };
+  }
+  const auth = browser ? await readSession() : await readSession(request);
+  if (!auth) return { error: errorJson("Please sign in", 401) as Response };
+  if (writing) {
     const header = request.headers.get("x-csrf-token") ?? "";
     if (!header || !safeEqual(header, auth.session.csrf_token)) {
       return { error: errorJson("Invalid security token", 403) as Response };
     }
-    return { customer: auth.customer, session: auth.session };
   }
-  const auth = await readSession();
-  if (!auth) return { error: errorJson("Please sign in", 401) as Response };
   return { customer: auth.customer, session: auth.session };
 }
 
