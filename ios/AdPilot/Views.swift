@@ -26,6 +26,7 @@ struct AuthView: View {
                     Text(Copy.text("Sign in", "دخول", language: language)).tag(false)
                 }
                 .pickerStyle(.segmented)
+                .onChange(of: registering) { _, _ in Keyboard.dismiss() }
                 if registering {
                     field(Copy.text("Your name", "اسمك", language: language), text: $name)
                     Picker(Copy.text("Language", "اللغة", language: language), selection: $language) {
@@ -46,6 +47,7 @@ struct AuthView: View {
                         : Copy.text("Sign in", "تسجيل الدخول", language: language),
                     enabled: !model.busy && email.contains("@") && password.count >= 8 && (!registering || name.count >= 2)
                 ) {
+                    Keyboard.dismiss()
                     Task {
                         if registering {
                             await model.register(name: name, email: email, password: password, language: language)
@@ -57,6 +59,7 @@ struct AuthView: View {
             }
             .padding(24)
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 
     private func field(_ title: String, text: Binding<String>) -> some View {
@@ -89,6 +92,7 @@ struct HomeView: View {
                     .foregroundStyle(AdColor.cream)
                     if model.activeBusiness == nil {
                         GoldButton(title: Copy.text("Add a business", "أضف عملاً", language: model.language)) {
+                            Keyboard.dismiss()
                             model.tab = 3
                         }
                     } else {
@@ -104,6 +108,7 @@ struct HomeView: View {
                             title: Copy.text("Create Advertisement", "أنشئ الإعلان", language: model.language),
                             enabled: prompt.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 && !model.busy
                         ) {
+                            Keyboard.dismiss()
                             let text = prompt
                             prompt = ""
                             Task {
@@ -136,6 +141,7 @@ struct HomeView: View {
                 }
                 .padding(20)
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("AdPilot")
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
@@ -170,6 +176,7 @@ struct CreateAdView: View {
                                 .background(AdColor.surface)
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
                             GoldButton(title: Copy.text("Send", "إرسال", language: model.language), enabled: !draft.trimmingCharacters(in: .whitespaces).isEmpty) {
+                                Keyboard.dismiss()
                                 let text = draft
                                 draft = ""
                                 Task { await model.sendCampaign(text: text) }
@@ -272,12 +279,14 @@ struct CreateAdView: View {
                         ))
                         .foregroundStyle(AdColor.muted)
                         GoldButton(title: Copy.text("Go to Home", "إلى الرئيسية", language: model.language)) {
+                            Keyboard.dismiss()
                             model.tab = 0
                         }
                     }
                     .padding(20)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(Copy.text("Create Ad", "إنشاء إعلان", language: model.language))
         }
     }
@@ -438,6 +447,7 @@ struct BusinessChat: View {
                             .background(AdColor.surface)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                         GoldButton(title: Copy.text("Send", "إرسال", language: model.language), enabled: !draft.trimmingCharacters(in: .whitespaces).isEmpty) {
+                            Keyboard.dismiss()
                             let text = draft
                             draft = ""
                             Task { await send(text: text) }
@@ -455,6 +465,7 @@ struct BusinessChat: View {
             }
             .padding(20)
         }
+        .scrollDismissesKeyboard(.interactively)
         .task { await reload() }
     }
 
@@ -523,6 +534,7 @@ struct AccountView: View {
                 }
                 .padding(20)
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(Copy.text("Account", "الحساب", language: model.language))
             .onAppear { name = model.customer?.name ?? "" }
         }

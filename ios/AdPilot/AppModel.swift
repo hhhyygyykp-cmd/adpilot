@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import UIKit
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -216,6 +217,7 @@ final class AppModel: ObservableObject {
     }
 
     private func auth(_ method: String, _ path: String, _ body: [String: Any]) async {
+        Keyboard.dismiss()
         busy = true
         defer { busy = false }
         do {

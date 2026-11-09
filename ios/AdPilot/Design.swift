@@ -1,4 +1,11 @@
 import SwiftUI
+import UIKit
+
+enum Keyboard {
+    static func dismiss() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}
 
 enum AdColor {
     static let ink = Color(red: 0.047, green: 0.043, blue: 0.035)
