@@ -2,6 +2,7 @@ import "server-only";
 
 import { newId } from "../crypto";
 import { sql } from "../db";
+import { redactFalMessage } from "./fal-key";
 import { testingBudgetUsd, type FalKind } from "./fal-models";
 
 export type FalJobStatus = "queued" | "in_progress" | "completed" | "failed";
@@ -147,7 +148,7 @@ function mapJob(row: Row): FalJob {
     requestId: row.request_id,
     mediaUrls: urls,
     costUsd: Number(row.cost_usd),
-    error: row.error,
+    error: row.error ? redactFalMessage(row.error) : null,
     createdAt: new Date(row.created_at).toISOString(),
   };
 }

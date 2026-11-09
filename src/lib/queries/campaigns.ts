@@ -17,6 +17,7 @@ import {
   summaryPrompt,
 } from "../conversation/engine";
 import { listCreatives } from "./creatives";
+import { redactFalMessage } from "../media/fal-key";
 import { buildMediaQuote, falKeyConfigured } from "../media/quote";
 import { emptyFacts } from "../conversation/extract";
 import { newId } from "../crypto";
@@ -108,7 +109,7 @@ function mapCampaign(row: CampaignRow): Campaign {
     conceptSet,
     creatives: [],
     generationStatus: row.generation_status || "not_started",
-    generationNote: row.generation_note || "",
+    generationNote: redactFalMessage(row.generation_note || ""),
     paidImageCount,
     paidVideoCount,
     mediaQuote: buildMediaQuote({

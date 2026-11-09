@@ -7,7 +7,7 @@ import {
   imageCost,
   videoCost,
 } from "./fal-models";
-import { falKeyConfigured } from "./quote";
+import { falKeyConfigured, publicFalError, readFalKey } from "./fal-key";
 import { isPublicMediaUrl, mediaUrls } from "./fal-service";
 import {
   attachFalRequest,
@@ -18,7 +18,7 @@ import { sniff } from "./sniff";
 import type { GeneratedMedia } from "./provider";
 
 function configureFal() {
-  const key = process.env.FAL_KEY?.trim();
+  const key = readFalKey();
   if (!key || !falKeyConfigured()) throw new Error("FAL_KEY is not configured");
   fal.config({ credentials: key });
   return key;
@@ -57,8 +57,9 @@ export async function falGenerateStill(prompt: string, customerId?: string): Pro
     if (jobId) await finishFalJob(jobId, "completed", urls, null);
     return { buffer, mimeType: mime.split(";")[0], provider: "fal", kind: "image" };
   } catch (error) {
-    if (jobId) await finishFalJob(jobId, "failed", [], error instanceof Error ? error.message.slice(0, 240) : "fal request failed");
-    throw error;
+    const message = publicFalError(error);
+    if (jobId) await finishFalJob(jobId, "failed", [], message);
+    throw new Error(message);
   }
 }
 
@@ -92,8 +93,9 @@ export async function falGenerateVideo(prompt: string, customerId?: string): Pro
     if (jobId) await finishFalJob(jobId, "completed", urls, null);
     return { buffer, mimeType: "video/mp4", provider: "fal", kind: "video" };
   } catch (error) {
-    if (jobId) await finishFalJob(jobId, "failed", [], error instanceof Error ? error.message.slice(0, 240) : "fal request failed");
-    throw error;
+    const message = publicFalError(error);
+    if (jobId) await finishFalJob(jobId, "failed", [], message);
+    throw new Error(message);
   }
 }
 

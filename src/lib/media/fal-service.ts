@@ -1,7 +1,7 @@
 import "server-only";
 
 import { fal } from "@fal-ai/client";
-import { falKeyConfigured } from "./quote";
+import { falKeyConfigured, publicFalError, readFalKey } from "./fal-key";
 import { prepareFalInput } from "./fal-input";
 import type { FalKind } from "./fal-models";
 import {
@@ -145,7 +145,7 @@ export function isPublicMediaUrl(value: string): boolean {
 }
 
 function ensureKey() {
-  const key = process.env.FAL_KEY?.trim();
+  const key = readFalKey();
   if (!key || !falKeyConfigured()) throw new FalRequestError("FAL_KEY is not configured", 503);
   fal.config({ credentials: key });
 }
@@ -171,10 +171,7 @@ function retryable(error: unknown): boolean {
 }
 
 function safeFalMessage(error: unknown): string {
-  const key = process.env.FAL_KEY?.trim();
-  const message = error instanceof Error ? error.message : "fal request failed";
-  const cleaned = key ? message.replaceAll(key, "[redacted]") : message;
-  return cleaned.slice(0, 240) || "fal request failed";
+  return publicFalError(error);
 }
 
 function delay(ms: number) {

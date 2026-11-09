@@ -6,6 +6,8 @@ import {
   KLING_USD_PER_SECOND,
 } from "./fal-models";
 
+export { falKeyConfigured } from "./fal-key";
+
 export const FAL_STILL_MODEL = FAL_IMAGE_MODEL;
 export const FAL_VIDEO_MODEL_ID = FAL_VIDEO_MODEL;
 export const FAL_STILL_USD = Number((FLUX_USD_PER_MEGAPIXEL * 0.262144).toFixed(6));
@@ -13,10 +15,6 @@ export const FAL_VIDEO_USD_PER_SEC = KLING_USD_PER_SECOND;
 export const FAL_VIDEO_SECONDS = 5;
 export const PAID_IMAGE_LIMIT = 3;
 export const PAID_VIDEO_LIMIT = 2;
-
-export function falKeyConfigured(): boolean {
-  return Boolean(process.env.FAL_KEY?.trim());
-}
 
 export function campaignWantsVideo(campaign: Pick<Campaign, "formatPreference" | "conceptSet">): boolean {
   if (campaign.formatPreference === "video" || campaign.formatPreference === "both") return true;

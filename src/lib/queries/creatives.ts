@@ -3,6 +3,7 @@ import "server-only";
 import { newId } from "../crypto";
 import { parseJson, sql } from "../db";
 import { falGenerateStill, falGenerateVideo } from "../media/fal";
+import { publicFalError } from "../media/fal-key";
 import { localPreviewStill } from "../media/local-still";
 import { buildImagePrompt, buildVideoPrompt } from "../media/prompt";
 import type { GeneratedMedia } from "../media/provider";
@@ -152,7 +153,7 @@ export async function generateCampaignMedia(input: {
     await finish(campaign, "ready", note);
     return { status: "ready", note };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Generation failed";
+    const message = publicFalError(error, "Generation failed");
     const existing = await listCreatives(campaign.customerId, campaign.id);
     if (existing.some((item) => item.kind === "image")) {
       const note = `A later generate call failed (${message}). The previously stored real image is still on file.`;
