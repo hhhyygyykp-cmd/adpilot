@@ -10,8 +10,20 @@ enum APIError: LocalizedError {
     }
 }
 
+enum APIEnvironment {
+    /// Xcode Run uses Debug and talks to the Next.js server on this Mac.
+    /// Archive and Release keep the hosted address and do not make it public.
+    static let baseURL: URL = {
+        #if DEBUG
+        return URL(string: "http://127.0.0.1:3000")!
+        #else
+        return URL(string: "https://adpilot.apps.grok.bot")!
+        #endif
+    }()
+}
+
 struct APIClient {
-    var baseURL = URL(string: "https://adpilot.apps.grok.bot")!
+    var baseURL = APIEnvironment.baseURL
     var token: String?
     var csrf: String?
 
@@ -48,13 +60,26 @@ struct APIClient {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw APIError.message(
+                "Cannot reach AdPilot at \(baseURL.absoluteString). On this Mac, run npm run dev and leave it running."
+            )
+        }
         let http = response as? HTTPURLResponse
         let status = http?.statusCode ?? 0
         let type = http?.value(forHTTPHeaderField: "Content-Type") ?? ""
-        if type.contains("text/html") || looksLikeGate(data) {
+        if looksLikeGate(data) {
             throw APIError.message(
-                "The AdPilot server is still private. In Cursor, set the hosted app to Public so this phone can reach it."
+                "This request reached the private hosted app. Run from Xcode using the Debug configuration so it uses http://127.0.0.1:3000."
+            )
+        }
+        if type.contains("text/html") {
+            throw APIError.message(
+                "AdPilot at \(baseURL.absoluteString) did not return app data. Start the local server with npm run dev."
             )
         }
         if status == 401 {

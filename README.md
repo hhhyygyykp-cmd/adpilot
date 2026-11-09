@@ -4,9 +4,18 @@ An AI advertising agency app. Customers describe what they want to promote. AdPi
 
 Phase 1–2 in this tree: accounts, business profiles, conversational briefs. No Runway or paid media calls.
 
-## iPhone app
+## iPhone Simulator
 
-Open `ios/AdPilot.xcodeproj` in Xcode on a Mac, select your team, and run it on a phone or simulator. The app talks to the hosted API at `https://adpilot.apps.grok.bot`. That host must be public, or the phone is stopped by Cursor’s sign-in gate. Change `baseURL` in `ios/AdPilot/APIClient.swift` if the API moves.
+Open `ios/AdPilot.xcodeproj` in Xcode and press Run. A Debug run uses `http://127.0.0.1:3000` on this Mac. The iOS Simulator shares the Mac’s network, and the dev server listens on `127.0.0.1` only, so the app uses that address rather than `localhost`. Release builds still use `https://adpilot.apps.grok.bot` and do not make that site public.
+
+Start the server first, in the repo folder:
+
+```bash
+npm run dev
+npm run demo
+```
+
+Sign in with the account printed by `npm run demo`. Paid generation stays off.
 
 This copy does not publish to Instagram or Facebook, and it does not invent ad analytics.
 
