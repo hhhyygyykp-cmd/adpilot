@@ -553,7 +553,7 @@ struct CreateAdView: View {
             AppButton(Copy.text("Back", "رجوع", language: model.language), role: .outline) {
                 forceStep = 1
             }
-            AppButton(Copy.text("Continue", "متابعة", language: model.language), systemImage: "arrow.right", imageEdge: .trailing, isLoading: model.busy) {
+            AppButton(Copy.text("Continue", "متابعة", language: model.language), isLoading: model.busy, systemImage: "arrow.right", imageEdge: .trailing) {
                 Task {
                     model.errorMessage = nil
                     if campaign.conceptSet?.selectedId == nil {
@@ -776,6 +776,53 @@ struct CreateAdView: View {
         if hasVideo { return Copy.text("Video", "فيديو", language: model.language) }
         if hasImage { return Copy.text("Image", "صورة", language: model.language) }
         return campaign.conceptSet?.concepts.first { $0.id == (campaign.conceptSet?.selectedId ?? "") }?.recommendedFormat ?? "—"
+    }
+}
+
+private struct StepProgress: View {
+    let step: Int
+    let language: String
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(1...4, id: \.self) { index in
+                VStack(spacing: 6) {
+                    Text("\(index)")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(index <= step ? .white : AppColor.mutedForeground)
+                        .frame(width: 28, height: 28)
+                        .background {
+                            if index <= step {
+                                Circle().fill(AppColor.brandGradient)
+                            } else {
+                                Circle().stroke(AppColor.border, lineWidth: 1)
+                            }
+                        }
+                    Text(title(index))
+                        .font(.system(size: 11, weight: index == step ? .semibold : .regular))
+                        .foregroundStyle(index == step ? AppColor.foreground : AppColor.mutedForeground)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity)
+                if index < 4 {
+                    Rectangle()
+                        .fill(index < step ? AppColor.accent : AppColor.border)
+                        .frame(height: 2)
+                        .offset(y: -10)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Copy.text("Step \(step) of 4", "الخطوة \(step) من 4", language: language))
+    }
+
+    private func title(_ index: Int) -> String {
+        switch index {
+        case 1: return Copy.text("Brief", "الملخص", language: language)
+        case 2: return Copy.text("Strategy", "الاستراتيجية", language: language)
+        case 3: return Copy.text("Create", "الإنشاء", language: language)
+        default: return Copy.text("Result", "النتيجة", language: language)
+        }
     }
 }
 
