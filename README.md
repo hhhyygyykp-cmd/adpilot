@@ -17,7 +17,13 @@ npm run demo
 
 Sign in with the account printed by `npm run demo`. Paid generation stays off.
 
-This copy does not publish to Instagram or Facebook, and it does not invent ad analytics.
+Agency Instagram publishing uses one professional account that only an administrator connects in `/admin/settings`. Customers never connect Instagram. A finished ad is posted only after customer approval and an explicit admin Publish action. Live Instagram post IDs and insights are stored only when Meta returns them.
+
+Optional Instagram secrets (add in Cursor secrets, never paste values into chat):
+
+- `META_APP_ID` — Instagram app ID from the Meta app Instagram product
+- `META_APP_SECRET` — Instagram app secret
+- `META_PUBLIC_ORIGIN` — public `https://` origin used for the OAuth redirect URI and for Instagram to fetch creatives (required for a real post; `http://127.0.0.1` cannot be fetched by Meta)
 
 ## Run locally
 

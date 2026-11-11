@@ -17,6 +17,7 @@ import {
   nextMissing,
   summaryPrompt,
 } from "../conversation/engine";
+import { maybeRefreshInsights, listPublicationsForCustomer } from "../instagram/publications";
 import { importMissingFalVideo, listCreatives } from "./creatives";
 import { hasProductPhoto } from "../media/brand-assets";
 import { redactFalMessage } from "../media/fal-key";
@@ -110,6 +111,7 @@ function mapCampaign(row: CampaignRow): Campaign {
     marketingPlan: "framework" in plan || "verifiedFacts" in plan ? (plan as MarketingPlan) : null,
     conceptSet,
     creatives: [],
+    publications: [],
     generationStatus: row.generation_status || "not_started",
     generationNote: redactFalMessage(row.generation_note || ""),
     paidImageCount,
@@ -193,6 +195,8 @@ async function loadCampaign(customerId: string, id: string): Promise<Campaign> {
   );
   const campaign = mapCampaign(rows[0]);
   campaign.creatives = await listCreatives(customerId, id);
+  const publications = await listPublicationsForCustomer(customerId, [id]);
+  campaign.publications = await maybeRefreshInsights(publications.get(id) ?? []);
   return campaign;
 }
 
@@ -285,7 +289,15 @@ export async function listCampaigns(customerId: string): Promise<Campaign[]> {
      order by c.updated_at desc`,
     [customerId],
   );
-  return rows.map(mapCampaign);
+  const campaigns = rows.map(mapCampaign);
+  const publications = await listPublicationsForCustomer(
+    customerId,
+    campaigns.map((item) => item.id),
+  );
+  for (const campaign of campaigns) {
+    campaign.publications = publications.get(campaign.id) ?? [];
+  }
+  return campaigns;
 }
 
 export async function getCampaign(customerId: string, id: string) {
@@ -308,6 +320,8 @@ export async function getCampaign(customerId: string, id: string) {
   }
   campaign.creatives = await listCreatives(customerId, id);
   if (await importMissingFalVideo(campaign)) return getCampaign(customerId, id);
+  const publications = await listPublicationsForCustomer(customerId, [id]);
+  campaign.publications = await maybeRefreshInsights(publications.get(id) ?? []);
   return campaign;
 }
 

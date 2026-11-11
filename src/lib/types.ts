@@ -99,6 +99,44 @@ export type CampaignCreative = {
   createdAt: string;
 };
 
+export type InstagramPublishStatus =
+  | "pending_admin"
+  | "authorized"
+  | "publishing"
+  | "published"
+  | "failed"
+  | "withdrawn"
+  | "declined";
+
+export type InstagramInsights = {
+  views?: number;
+  impressions?: number;
+  reach?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  saves?: number;
+};
+
+export type CampaignPublication = {
+  id: string;
+  campaignId: string;
+  creativeId: string;
+  kind: "image" | "video";
+  caption: string;
+  requestedAt: string | null;
+  customerApprovedAt: string | null;
+  adminAuthorized: boolean;
+  status: InstagramPublishStatus;
+  igMediaId: string | null;
+  permalink: string | null;
+  publishedAt: string | null;
+  lastError: string;
+  insights: InstagramInsights | null;
+  insightsUnavailable: string | null;
+  insightsFetchedAt: string | null;
+};
+
 export type MediaQuoteLine = {
   provider: "fal";
   model: string;
@@ -221,6 +259,7 @@ export type Campaign = {
   marketingPlan: MarketingPlan | null;
   conceptSet: ConceptSet | null;
   creatives: CampaignCreative[];
+  publications: CampaignPublication[];
   generationStatus: GenerationStatus;
   generationNote: string;
   paidImageCount: number;

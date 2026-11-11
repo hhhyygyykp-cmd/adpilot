@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Shell } from "@/components/shell";
 import { useSession } from "@/components/providers";
 import { api } from "@/lib/api-client";
+import { publicationLabelKey } from "@/components/publication-panel";
 import type { Campaign } from "@/lib/types";
 
 export default function AdsPage() {
@@ -32,9 +33,13 @@ export default function AdsPage() {
         <p className="mt-8 text-[var(--muted)]">{t("ads.empty")}</p>
       ) : (
         <ul className="mt-8 grid gap-3">
-          {campaigns.map((campaign) => (
+          {campaigns.map((campaign) => {
+            const published = campaign.publications.find((item) => item.status === "published");
+            const latest = campaign.publications[0];
+            const href = published ? `/ads/${campaign.id}` : `/create?id=${campaign.id}`;
+            return (
             <li key={campaign.id}>
-              <Link href={`/create?id=${campaign.id}`} className="panel block rounded-2xl p-5">
+              <Link href={href} className="panel block rounded-2xl p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="font-medium">
@@ -48,14 +53,18 @@ export default function AdsPage() {
                         ? ` · ${campaign.conceptSet.concepts.find((item) => item.id === campaign.conceptSet?.selectedId)?.title || t(`concepts.${campaign.conceptSet.selectedId}`)}`
                         : ""}
                     </p>
+                    {latest ? (
+                      <p className="mt-2 text-xs text-[var(--gold)]">{t(publicationLabelKey(latest.status))}</p>
+                    ) : null}
                   </div>
                   <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs uppercase tracking-[0.14em] text-[var(--gold)]">
-                    {statusLabel[campaign.status] ?? campaign.status}
+                    {published ? t("ads.published") : statusLabel[campaign.status] ?? campaign.status}
                   </span>
                 </div>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </Shell>

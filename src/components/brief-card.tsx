@@ -11,6 +11,8 @@ export function BriefCard({
   onConfirm,
   onChooseConcept,
   onGenerate,
+  onApprove,
+  onWithdraw,
   generating,
 }: {
   campaign: Campaign;
@@ -20,6 +22,12 @@ export function BriefCard({
     useRecommended?: boolean;
   }) => Promise<void>;
   onGenerate?: (body: { authorizePaid?: boolean; video?: boolean }) => Promise<void>;
+  onApprove?: (body: {
+    creativeId: string;
+    caption: string;
+    requestedAt: string;
+  }) => Promise<void>;
+  onWithdraw?: (publicationId: string) => Promise<void>;
   generating?: boolean;
 }) {
   const { t } = useSession();
@@ -74,7 +82,13 @@ export function BriefCard({
         onChoose={campaign.status === "brief_ready" ? onChooseConcept : undefined}
         onConfirm={canConfirm ? onConfirm : undefined}
       />
-      <MediaCard campaign={campaign} onGenerate={onGenerate} busy={generating} />
+      <MediaCard
+        campaign={campaign}
+        onGenerate={onGenerate}
+        onApprove={onApprove}
+        onWithdraw={onWithdraw}
+        busy={generating}
+      />
     </div>
   );
 }

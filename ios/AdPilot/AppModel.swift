@@ -162,6 +162,35 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func approveCreative(id creativeId: String, caption: String, requestedAt: String?) async {
+        guard let id = campaign?.id else { return }
+        do {
+            busy = true
+            defer { busy = false }
+            var body: [String: Any] = ["creativeId": creativeId, "caption": caption]
+            if let requestedAt, !requestedAt.isEmpty { body["requestedAt"] = requestedAt }
+            let payload: CampaignPayload = try await api.send("POST", "/api/campaigns/\(id)/approve", body: body)
+            campaign = payload.campaign
+            await refreshLists()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func withdrawPublication(_ publicationId: String) async {
+        guard let id = campaign?.id else { return }
+        do {
+            let payload: CampaignPayload = try await api.send("POST", "/api/campaigns/\(id)/publication", body: [
+                "action": "withdraw",
+                "publicationId": publicationId,
+            ])
+            campaign = payload.campaign
+            await refreshLists()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func generate(authorizePaid: Bool) async {
         guard let id = campaign?.id else { return }
         do {

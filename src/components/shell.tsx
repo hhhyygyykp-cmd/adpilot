@@ -75,6 +75,8 @@ export function Shell({
         { href: "/admin/businesses", key: "admin.businesses" },
         { href: "/admin/campaigns", key: "admin.campaigns" },
         { href: "/admin/knowledge", key: "admin.knowledge" },
+        { href: "/admin/publishing", key: "admin.publishing" },
+        { href: "/admin/settings", key: "admin.settings" },
         { href: "/admin/jobs", key: "admin.jobs" },
       ]
     : customerLinks;

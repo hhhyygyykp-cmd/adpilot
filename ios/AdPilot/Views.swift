@@ -313,7 +313,6 @@ struct CreateAdView: View {
     @State private var authorize = false
     @State private var forceStep: Int?
     @State private var mediaMode = "image"
-    @State private var approved = false
 
     var body: some View {
         let motion: Animation? = reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.86)
@@ -359,7 +358,6 @@ struct CreateAdView: View {
                     .onChange(of: campaign.id) { _, _ in
                         authorize = false
                         forceStep = nil
-                        approved = false
                         mediaMode = "image"
                     }
                     .onChange(of: stillCount) { oldCount, newCount in
@@ -676,22 +674,30 @@ struct CreateAdView: View {
             resultAction(Copy.text("Regenerate", "إعادة", language: model.language), systemImage: "arrow.triangle.2.circlepath") { forceStep = 3 }
         }
         Text(Copy.text(
-            "Share under the preview saves the file. Approve only marks it reviewed on this phone.",
-            "المشاركة تحت المعاينة تحفظ الملف. الموافقة تعلّمه كمراجع على هذا الهاتف فقط.",
+            "Approve sends this finished ad to the agency queue. AdPilot publishes it only after an administrator authorizes the agency Instagram account. You never connect Instagram.",
+            "الموافقة ترسل الإعلان النهائي إلى قائمة الوكالة. أدبايلوت لا ينشره إلا بعد تفويض المسؤول لحساب إنستغرام الخاص بالوكالة. لن تربط إنستغرام بنفسك.",
             language: model.language
         ))
         .font(AppFont.caption)
         .foregroundStyle(AppColor.mutedForeground)
-        AppButton(
-            approved
-                ? Copy.text("Approved", "تمت الموافقة", language: model.language)
-                : Copy.text("Approve", "موافقة", language: model.language),
-            systemImage: "checkmark"
-        ) {
-            approved = true
-            AppHaptic.notify(success: true)
+        if let creative = (mediaMode == "video" ? videos.first : images.first) {
+            let publication = campaign.publications.first { $0.creativeId == creative.id }
+            if let publication {
+                publicationBlock(publication)
+            } else {
+                AppButton(
+                    Copy.text("Approve this advertisement", "الموافقة على هذا الإعلان", language: model.language),
+                    systemImage: "checkmark"
+                ) {
+                    Task {
+                        await model.approveCreative(id: creative.id, caption: defaultCaption(campaign), requestedAt: nil)
+                        AppHaptic.notify(success: model.errorMessage == nil)
+                    }
+                }
+                .disabled(model.busy)
+                .accessibilityHint(Copy.text("Sends this ad to the agency Instagram queue. It does not post it.", "يرسل الإعلان إلى قائمة إنستغرام الخاصة بالوكالة. لا ينشره.", language: model.language))
+            }
         }
-        .accessibilityHint(Copy.text("Marks this ad reviewed on this phone. It does not publish it.", "يعلّم الإعلان كمراجع على هذا الهاتف. لا ينشره.", language: model.language))
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text(Copy.text("Campaign Summary", "ملخص الحملة", language: model.language))
                 .font(AppFont.section)
@@ -761,6 +767,93 @@ struct CreateAdView: View {
                 .multilineTextAlignment(.trailing)
         }
         .font(AppFont.caption)
+    }
+
+    @ViewBuilder
+    private func publicationBlock(_ publication: Publication) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            AppBadge(title: publicationStatus(publication.status), tone: publication.status == "published" ? .positive : .accent)
+            if !publication.caption.isEmpty {
+                Text(publication.caption)
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.mutedForeground)
+            }
+            if publication.status == "published", let permalink = publication.permalink, let url = URL(string: permalink) {
+                Link(Copy.text("Open on Instagram", "فتح على إنستغرام", language: model.language), destination: url)
+                    .font(AppFont.button)
+                if let publishedAt = publication.publishedAt {
+                    Text(Copy.text("Published", "نُشر", language: model.language) + " · " + publishedAt)
+                        .font(AppFont.caption)
+                        .foregroundStyle(AppColor.mutedForeground)
+                }
+                insightRows(publication.insights)
+                if let unavailable = publication.insightsUnavailable, !unavailable.isEmpty {
+                    Text(Copy.text("Insights unavailable", "الرؤى غير متاحة", language: model.language) + ": " + unavailable)
+                        .font(AppFont.caption)
+                        .foregroundStyle(AppColor.mutedForeground)
+                }
+            }
+            if publication.status == "failed", !publication.lastError.isEmpty {
+                Text(publication.lastError)
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.destructive)
+            }
+            if publication.igMediaId == nil {
+                Button(Copy.text("Withdraw approval", "سحب الموافقة", language: model.language)) {
+                    Task { await model.withdrawPublication(publication.id) }
+                }
+                .font(AppFont.caption)
+                .foregroundStyle(AppColor.mutedForeground)
+            }
+        }
+        .padding(AppSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func insightRows(_ insights: InsightValues?) -> some View {
+        if let insights {
+            let rows: [(String, Int?)] = [
+                (Copy.text("Views", "المشاهدات", language: model.language), insights.views),
+                (Copy.text("Impressions", "الظهور", language: model.language), insights.impressions),
+                (Copy.text("Reach", "الوصول", language: model.language), insights.reach),
+                (Copy.text("Likes", "الإعجابات", language: model.language), insights.likes),
+                (Copy.text("Comments", "التعليقات", language: model.language), insights.comments),
+                (Copy.text("Shares", "المشاركات", language: model.language), insights.shares),
+                (Copy.text("Saves", "الحفظ", language: model.language), insights.saves),
+            ].filter { $0.1 != nil }
+            if rows.isEmpty {
+                Text(Copy.text("Instagram has not returned insights for this post yet.", "لم يُرجع إنستغرام رؤى لهذا المنشور بعد.", language: model.language))
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.mutedForeground)
+            } else {
+                ForEach(rows, id: \.0) { row in
+                    summaryRow(row.0, String(row.1 ?? 0))
+                }
+            }
+        }
+    }
+
+    private func publicationStatus(_ value: String) -> String {
+        switch value {
+        case "pending_admin": return Copy.text("Approved — in the agency queue", "موافق عليه — في قائمة الوكالة", language: model.language)
+        case "authorized": return Copy.text("Authorized — waiting to publish", "مفوض — بانتظار النشر", language: model.language)
+        case "publishing": return Copy.text("Publishing", "جارٍ النشر", language: model.language)
+        case "published": return Copy.text("Published on Instagram", "نُشر على إنستغرام", language: model.language)
+        case "failed": return Copy.text("Publishing failed", "فشل النشر", language: model.language)
+        case "withdrawn": return Copy.text("Approval withdrawn", "سُحبت الموافقة", language: model.language)
+        case "declined": return Copy.text("Not authorized", "غير مفوض", language: model.language)
+        default: return value
+        }
+    }
+
+    private func defaultCaption(_ campaign: Campaign) -> String {
+        [campaign.productName, campaign.offer, campaign.objective]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
     }
 
     private func selectedStrategy(_ campaign: Campaign) -> String {
@@ -942,7 +1035,7 @@ struct AdsView: View {
                                 Text(item.title)
                                     .font(AppFont.body)
                                     .foregroundStyle(AppColor.foreground)
-                                AppBadge(title: status(item.status), tone: tone(item.status))
+                                AppBadge(title: status(item), tone: tone(item))
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .frame(minHeight: 44)
@@ -964,17 +1057,30 @@ struct AdsView: View {
         }
     }
 
-    private func status(_ value: String) -> String {
-        switch value {
+    private func status(_ item: Campaign) -> String {
+        if item.publications.contains(where: { $0.status == "published" }) {
+            return Copy.text("Published on Instagram", "نُشر على إنستغرام", language: model.language)
+        }
+        if let latest = item.publications.first {
+            switch latest.status {
+            case "pending_admin": return Copy.text("Approved — in the agency queue", "موافق عليه — في قائمة الوكالة", language: model.language)
+            case "authorized": return Copy.text("Authorized — waiting to publish", "مفوض — بانتظار النشر", language: model.language)
+            case "failed": return Copy.text("Publishing failed", "فشل النشر", language: model.language)
+            default: break
+            }
+        }
+        switch item.status {
         case "drafting": return Copy.text("In conversation", "في المحادثة", language: model.language)
         case "brief_ready": return Copy.text("Brief ready", "الملخص جاهز", language: model.language)
         case "confirmed": return Copy.text("Brief confirmed", "تم التأكيد", language: model.language)
-        default: return value
+        default: return item.status
         }
     }
 
-    private func tone(_ value: String) -> AppBadgeTone {
-        switch value {
+    private func tone(_ item: Campaign) -> AppBadgeTone {
+        if item.publications.contains(where: { $0.status == "published" }) { return .positive }
+        if item.publications.contains(where: { $0.status == "pending_admin" || $0.status == "authorized" }) { return .accent }
+        switch item.status {
         case "brief_ready": return .accent
         case "confirmed": return .positive
         default: return .neutral

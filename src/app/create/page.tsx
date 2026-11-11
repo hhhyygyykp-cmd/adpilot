@@ -167,6 +167,27 @@ function CreateAd() {
                     }
                   : undefined
               }
+              onApprove={
+                campaign.status === "confirmed" && campaign.creatives.length > 0
+                  ? async (body) => {
+                      const data = await api<{ campaign: Campaign }>(
+                        `/api/campaigns/${campaign.id}/approve`,
+                        { method: "POST", body: JSON.stringify(body) },
+                      );
+                      setCampaign(data.campaign);
+                    }
+                  : undefined
+              }
+              onWithdraw={async (publicationId) => {
+                const data = await api<{ campaign: Campaign }>(
+                  `/api/campaigns/${campaign.id}/publication`,
+                  {
+                    method: "POST",
+                    body: JSON.stringify({ action: "withdraw", publicationId }),
+                  },
+                );
+                setCampaign(data.campaign);
+              }}
             />
             </div>
           ) : (

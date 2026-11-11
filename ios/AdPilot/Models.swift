@@ -120,6 +120,33 @@ struct Creative: Decodable, Identifiable {
     var originalName: String
 }
 
+struct InsightValues: Decodable {
+    var views: Int?
+    var impressions: Int?
+    var reach: Int?
+    var likes: Int?
+    var comments: Int?
+    var shares: Int?
+    var saves: Int?
+}
+
+struct Publication: Decodable, Identifiable {
+    let id: String
+    var creativeId: String
+    var kind: String
+    var caption: String
+    var requestedAt: String?
+    var customerApprovedAt: String?
+    var adminAuthorized: Bool
+    var status: String
+    var igMediaId: String?
+    var permalink: String?
+    var publishedAt: String?
+    var lastError: String
+    var insights: InsightValues?
+    var insightsUnavailable: String?
+}
+
 struct QuoteLine: Decodable {
     var label: String
     var usd: Double
@@ -151,10 +178,36 @@ struct Campaign: Decodable, Identifiable {
     var conversation: [ChatMessage]
     var conceptSet: ConceptSet?
     var creatives: [Creative]
+    var publications: [Publication]
     var generationStatus: String
     var generationNote: String
     var mediaQuote: MediaQuote?
     var awaiting: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        businessId = c.str(.businessId)
+        businessName = try? c.decode(String.self, forKey: .businessName)
+        status = c.str(.status)
+        originalPrompt = c.str(.originalPrompt)
+        productName = try? c.decode(String.self, forKey: .productName)
+        offer = try? c.decode(String.self, forKey: .offer)
+        objective = try? c.decode(String.self, forKey: .objective)
+        conversation = (try? c.decode([ChatMessage].self, forKey: .conversation)) ?? []
+        conceptSet = try? c.decode(ConceptSet.self, forKey: .conceptSet)
+        creatives = (try? c.decode([Creative].self, forKey: .creatives)) ?? []
+        publications = (try? c.decode([Publication].self, forKey: .publications)) ?? []
+        generationStatus = c.str(.generationStatus)
+        generationNote = c.str(.generationNote)
+        mediaQuote = try? c.decode(MediaQuote.self, forKey: .mediaQuote)
+        awaiting = try? c.decode(String.self, forKey: .awaiting)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, businessId, businessName, status, originalPrompt, productName, offer, objective
+        case conversation, conceptSet, creatives, publications, generationStatus, generationNote, mediaQuote, awaiting
+    }
 
     var title: String {
         let named = productName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""

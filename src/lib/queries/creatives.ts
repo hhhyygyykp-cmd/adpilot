@@ -104,7 +104,7 @@ export async function listCreatives(customerId: string, campaignId: string): Pro
 }
 
 export async function getOwnedCreative(customerId: string, id: string, isAdmin = false) {
-  const rows = await sql<Row & { storage_key: string; customer_id: string }>(
+  const rows = await sql<Row & { storage_key: string; customer_id: string; campaign_id: string }>(
     isAdmin
       ? `select * from campaign_creatives where id = $1 limit 1`
       : `select * from campaign_creatives where id = $1 and customer_id = $2 limit 1`,
