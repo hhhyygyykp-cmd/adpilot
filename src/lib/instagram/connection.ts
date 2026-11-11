@@ -4,19 +4,25 @@ import { audit } from "../audit";
 import { decryptSecret, encryptSecret, newId, randomToken } from "../crypto";
 import { parseJson, sql } from "../db";
 import {
-  INSTAGRAM_SCOPES,
+  HOSTED_CALLBACK,
+  TARGET_INSTAGRAM_USERNAME,
+  UNIFIED_PERMISSIONS,
+  hostedOrigin,
   instagramRedirectUri,
   metaAppSecret,
   metaConfigured,
+  missingMetaSecrets,
+  normalizeInstagramUsername,
   publicOriginFromRequest,
 } from "./config";
 import {
   authorizationUrl,
   exchangeAuthorizationCode,
-  exchangeLongLivedToken,
   fetchInstagramProfile,
+  listAvailableInstagramAccounts,
+  listGrantedPermissions,
   publicInstagramError,
-  refreshLongLivedToken,
+  selectAgencyAccount,
 } from "./meta";
 
 export type AgencyInstagramPublic = {
@@ -34,6 +40,9 @@ export type AgencyInstagramPublic = {
   redirectUri: string;
   publicOrigin: string;
   scopes: string[];
+  missingSecrets: string[];
+  login: "unified";
+  targetUsername: string;
 };
 
 type AccountRow = {
@@ -78,7 +87,8 @@ async function ensureAccount(): Promise<AccountRow> {
 }
 
 function mapPublic(request: Request, row: AccountRow | null): AgencyInstagramPublic {
-  const configured = metaConfigured();
+  const missing = missingMetaSecrets();
+  const configured = missing.length === 0;
   const expired =
     row?.token_expires_at && new Date(row.token_expires_at).getTime() <= Date.now();
   let status: AgencyInstagramPublic["status"] = "not_configured";
@@ -102,9 +112,12 @@ function mapPublic(request: Request, row: AccountRow | null): AgencyInstagramPub
       ? new Date(row.last_refreshed_at).toISOString()
       : null,
     lastError: row?.last_error ?? "",
-    redirectUri: instagramRedirectUri(request),
-    publicOrigin: publicOriginFromRequest(request),
-    scopes: [...INSTAGRAM_SCOPES],
+    redirectUri: HOSTED_CALLBACK,
+    publicOrigin: hostedOrigin() || publicOriginFromRequest(request),
+    scopes: [...UNIFIED_PERMISSIONS],
+    missingSecrets: missing,
+    login: "unified",
+    targetUsername: TARGET_INSTAGRAM_USERNAME,
   };
 }
 
@@ -116,10 +129,10 @@ export async function startInstagramOAuth(input: {
   request: Request;
   adminCustomerId: string;
 }): Promise<{ url: string } | { error: string; status: number }> {
-  if (!metaConfigured()) {
+  const missing = missingMetaSecrets();
+  if (missing.length) {
     return {
-      error:
-        "META_APP_ID and META_APP_SECRET are not on the server yet. Add them in Cursor secrets, then connect Instagram.",
+      error: `Add these Cursor secrets, then connect Instagram: ${missing.join(", ")}. Redirect URI: ${HOSTED_CALLBACK}`,
       status: 409,
     };
   }
@@ -132,10 +145,76 @@ export async function startInstagramOAuth(input: {
   );
   return {
     url: authorizationUrl({
-      redirectUri: instagramRedirectUri(input.request),
+      redirectUri: instagramRedirectUri(),
       state,
     }),
   };
+}
+
+async function storeConnection(input: {
+  adminCustomerId: string;
+  token: string;
+  expiresIn: number;
+  permissions: string[];
+}): Promise<{ username: string }> {
+  const accounts = await listAvailableInstagramAccounts(input.token);
+  const selected = selectAgencyAccount(accounts);
+  if (!selected) {
+    throw new Error(
+      "Meta did not share any Instagram professional account. Select the agency account during Unified Login.",
+    );
+  }
+  const profile = await fetchInstagramProfile(input.token, selected.id);
+  const username = profile.username || selected.username;
+  const granted = input.permissions.length
+    ? input.permissions
+    : (await listGrantedPermissions(input.token)) || [...UNIFIED_PERMISSIONS];
+  const expiresAt =
+    input.expiresIn > 0 ? new Date(Date.now() + input.expiresIn * 1000).toISOString() : null;
+  const ciphertext = encryptSecret(input.token, metaAppSecret());
+  const row = await ensureAccount();
+  await sql(
+    `update agency_social_accounts set
+       ig_user_id = $2,
+       username = $3,
+       account_type = $4,
+       name = $5,
+       permissions = $6::jsonb,
+       token_ciphertext = $7,
+       token_expires_at = $8,
+       status = 'connected',
+       last_error = '',
+       connected_at = now(),
+       connected_by = $9,
+       last_refreshed_at = now(),
+       updated_at = now()
+     where id = $1`,
+    [
+      row.id,
+      profile.userId || profile.id,
+      username,
+      profile.accountType,
+      profile.name,
+      JSON.stringify(granted),
+      ciphertext,
+      expiresAt,
+      input.adminCustomerId,
+    ],
+  );
+  await audit({
+    actorCustomerId: input.adminCustomerId,
+    action: "instagram.connect",
+    entityType: "agency_social_account",
+    entityId: row.id,
+    metadata: {
+      username,
+      igUserId: profile.userId || profile.id,
+      permissions: granted,
+      login: "unified",
+      matchedTarget: normalizeInstagramUsername(username) === TARGET_INSTAGRAM_USERNAME,
+    },
+  });
+  return { username };
 }
 
 export async function completeInstagramOAuth(input: {
@@ -144,15 +223,12 @@ export async function completeInstagramOAuth(input: {
   code: string | null;
   state: string | null;
   oauthError: string | null;
-}): Promise<{ ok: true } | { error: string; status: number }> {
+}): Promise<{ ok: true; username: string } | { error: string; status: number }> {
   if (input.oauthError) {
     return { error: `Instagram authorization was not completed (${input.oauthError}).`, status: 400 };
   }
   if (!input.code || !input.state) {
-    return { error: "Instagram did not return an authorization code.", status: 400 };
-  }
-  if (!metaConfigured()) {
-    return { error: "META_APP_ID and META_APP_SECRET are missing, so the token cannot be stored.", status: 409 };
+    return { error: "Meta did not return an authorization code.", status: 400 };
   }
   const states = await sql<{ admin_customer_id: string }>(
     `delete from instagram_oauth_states
@@ -165,61 +241,24 @@ export async function completeInstagramOAuth(input: {
   if (expected.admin_customer_id !== input.adminCustomerId) {
     return { error: "Sign in as the same administrator who started Connect Instagram.", status: 403 };
   }
+  if (!metaConfigured()) {
+    return {
+      error: `Add these Cursor secrets, then connect Instagram: ${missingMetaSecrets().join(", ")}. Redirect URI: ${HOSTED_CALLBACK}`,
+      status: 409,
+    };
+  }
   try {
-    const shortLived = await exchangeAuthorizationCode({
+    const exchanged = await exchangeAuthorizationCode({
       code: input.code,
-      redirectUri: instagramRedirectUri(input.request),
+      redirectUri: instagramRedirectUri(),
     });
-    const longLived = await exchangeLongLivedToken(shortLived.accessToken);
-    const profile = await fetchInstagramProfile(longLived.accessToken);
-    const expiresAt =
-      longLived.expiresIn > 0
-        ? new Date(Date.now() + longLived.expiresIn * 1000).toISOString()
-        : null;
-    const permissions =
-      shortLived.permissions.length > 0 ? shortLived.permissions : [...INSTAGRAM_SCOPES];
-    const ciphertext = encryptSecret(longLived.accessToken, metaAppSecret());
-    const row = await ensureAccount();
-    await sql(
-      `update agency_social_accounts set
-         ig_user_id = $2,
-         username = $3,
-         account_type = $4,
-         name = $5,
-         permissions = $6::jsonb,
-         token_ciphertext = $7,
-         token_expires_at = $8,
-         status = 'connected',
-         last_error = '',
-         connected_at = now(),
-         connected_by = $9,
-         last_refreshed_at = now(),
-         updated_at = now()
-       where id = $1`,
-      [
-        row.id,
-        profile.userId || profile.id,
-        profile.username,
-        profile.accountType,
-        profile.name,
-        JSON.stringify(permissions),
-        ciphertext,
-        expiresAt,
-        input.adminCustomerId,
-      ],
-    );
-    await audit({
-      actorCustomerId: input.adminCustomerId,
-      action: "instagram.connect",
-      entityType: "agency_social_account",
-      entityId: row.id,
-      metadata: {
-        username: profile.username,
-        igUserId: profile.userId || profile.id,
-        permissions,
-      },
+    const saved = await storeConnection({
+      adminCustomerId: input.adminCustomerId,
+      token: exchanged.accessToken,
+      expiresIn: exchanged.expiresIn,
+      permissions: exchanged.permissions,
     });
-    return { ok: true };
+    return { ok: true, username: saved.username };
   } catch (error) {
     const message = publicInstagramError(error, "Instagram authorization failed.");
     const row = await ensureAccount();
@@ -265,20 +304,20 @@ export async function refreshInstagramConnection(adminCustomerId: string): Promi
   const live = await readLiveConnection();
   if ("error" in live) return live;
   try {
-    const refreshed = await refreshLongLivedToken(live.token);
-    const profile = await fetchInstagramProfile(refreshed.accessToken);
-    const expiresAt =
-      refreshed.expiresIn > 0
-        ? new Date(Date.now() + refreshed.expiresIn * 1000).toISOString()
-        : live.expiresAt;
+    const accounts = await listAvailableInstagramAccounts(live.token);
+    const selected = selectAgencyAccount(accounts);
+    if (!selected) {
+      throw new Error("Meta no longer shares an Instagram professional account for this token.");
+    }
+    const profile = await fetchInstagramProfile(live.token, selected.id);
+    const permissions = (await listGrantedPermissions(live.token)) || [];
     await sql(
       `update agency_social_accounts set
-         token_ciphertext = $2,
-         token_expires_at = $3,
-         username = $4,
-         account_type = $5,
-         name = $6,
-         ig_user_id = $7,
+         username = $2,
+         account_type = $3,
+         name = $4,
+         ig_user_id = $5,
+         permissions = coalesce(nullif($6::jsonb, '[]'::jsonb), permissions),
          status = 'connected',
          last_error = '',
          last_refreshed_at = now(),
@@ -286,12 +325,11 @@ export async function refreshInstagramConnection(adminCustomerId: string): Promi
        where id = $1`,
       [
         live.id,
-        encryptSecret(refreshed.accessToken, metaAppSecret()),
-        expiresAt,
-        profile.username,
+        profile.username || selected.username,
         profile.accountType,
         profile.name,
         profile.userId || profile.id,
+        JSON.stringify(permissions),
       ],
     );
     await audit({
@@ -299,11 +337,11 @@ export async function refreshInstagramConnection(adminCustomerId: string): Promi
       action: "instagram.refresh",
       entityType: "agency_social_account",
       entityId: live.id,
-      metadata: { username: profile.username },
+      metadata: { username: profile.username || selected.username, login: "unified" },
     });
     return { ok: true };
   } catch (error) {
-    const message = publicInstagramError(error, "Instagram token refresh failed.");
+    const message = publicInstagramError(error, "Instagram connection refresh failed.");
     await sql(
       `update agency_social_accounts set status = 'needs_reauth', last_error = $2, updated_at = now()
        where id = $1`,
@@ -325,7 +363,7 @@ export async function readLiveConnection(): Promise<
 > {
   if (!metaConfigured()) {
     return {
-      error: "META_APP_ID and META_APP_SECRET are not configured, so Instagram is not connected.",
+      error: `Add these Cursor secrets, then connect Instagram: ${missingMetaSecrets().join(", ")}. Redirect URI: ${HOSTED_CALLBACK}`,
       status: 409,
     };
   }

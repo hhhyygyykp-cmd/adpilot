@@ -1,18 +1,29 @@
 import "server-only";
 
-export const INSTAGRAM_GRAPH_VERSION = "v22.0";
-export const INSTAGRAM_GRAPH_HOST = "https://graph.instagram.com";
-export const INSTAGRAM_AUTHORIZE_URL = "https://www.instagram.com/oauth/authorize";
-export const INSTAGRAM_SHORT_LIVED_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
-export const INSTAGRAM_SCOPES = [
-  "instagram_business_basic",
-  "instagram_business_content_publish",
-  "instagram_business_manage_insights",
-] as const;
+export {
+  FACEBOOK_GRAPH_HOST,
+  FACEBOOK_GRAPH_VERSION,
+  FACEBOOK_OAUTH_DIALOG,
+  HOSTED_CALLBACK,
+  HOSTED_ORIGIN,
+  META_APP_ID_NAME,
+  META_APP_SECRET_NAME,
+  META_CONFIGURATION_ID_NAME,
+  META_PUBLIC_ORIGIN_NAME,
+  REQUIRED_SECRET_NAMES,
+  TARGET_INSTAGRAM_USERNAME,
+  UNIFIED_PERMISSIONS,
+  missingMetaSecretsFrom,
+  normalizeInstagramUsername,
+} from "./oauth";
 
-export const META_APP_ID_NAME = "META_APP_ID";
-export const META_APP_SECRET_NAME = "META_APP_SECRET";
-export const META_PUBLIC_ORIGIN_NAME = "META_PUBLIC_ORIGIN";
+import {
+  FACEBOOK_GRAPH_HOST,
+  FACEBOOK_GRAPH_VERSION,
+  HOSTED_CALLBACK,
+  HOSTED_ORIGIN,
+  missingMetaSecretsFrom,
+} from "./oauth";
 
 export function metaAppId(): string {
   return (process.env.META_APP_ID ?? "").trim();
@@ -22,35 +33,38 @@ export function metaAppSecret(): string {
   return (process.env.META_APP_SECRET ?? "").trim();
 }
 
-export function metaConfigured(): boolean {
-  return Boolean(metaAppId() && metaAppSecret());
+export function metaConfigurationId(): string {
+  return (process.env.META_CONFIGURATION_ID ?? "").trim();
 }
 
 export function metaPublicOriginOverride(): string {
   return (process.env.META_PUBLIC_ORIGIN ?? "").trim().replace(/\/$/, "");
 }
 
+export function missingMetaSecrets(): string[] {
+  return missingMetaSecretsFrom(process.env);
+}
+
+export function metaConfigured(): boolean {
+  return missingMetaSecrets().length === 0;
+}
+
 export function instagramRedirectPath(): string {
   return "/api/admin/instagram/callback";
+}
+
+export function hostedOrigin(): string {
+  return metaPublicOriginOverride() || HOSTED_ORIGIN;
 }
 
 export function publicOriginFromRequest(request: Request): string {
   const override = metaPublicOriginOverride();
   if (override) return override;
-  const url = new URL(request.url);
-  const proto =
-    request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
-    url.protocol.replace(":", "") ||
-    "http";
-  const host =
-    request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
-    request.headers.get("host") ||
-    url.host;
-  return `${proto}://${host}`;
+  return HOSTED_ORIGIN;
 }
 
-export function instagramRedirectUri(request: Request): string {
-  return `${publicOriginFromRequest(request)}${instagramRedirectPath()}`;
+export function instagramRedirectUri(): string {
+  return HOSTED_CALLBACK;
 }
 
 export function originIsPublicHttps(origin: string): boolean {
@@ -68,5 +82,5 @@ export function originIsPublicHttps(origin: string): boolean {
 
 export function graphUrl(path: string): string {
   const trimmed = path.startsWith("/") ? path : `/${path}`;
-  return `${INSTAGRAM_GRAPH_HOST}/${INSTAGRAM_GRAPH_VERSION}${trimmed}`;
+  return `${FACEBOOK_GRAPH_HOST}/${FACEBOOK_GRAPH_VERSION}${trimmed}`;
 }

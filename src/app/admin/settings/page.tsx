@@ -22,6 +22,9 @@ type Instagram = {
   redirectUri: string;
   publicOrigin: string;
   scopes: string[];
+  missingSecrets: string[];
+  login: string;
+  targetUsername: string;
 };
 
 function statusKey(status: string): string {
@@ -30,6 +33,15 @@ function statusKey(status: string): string {
   if (status === "needs_reauth") return "admin.needsReauth";
   if (status === "not_configured") return "admin.notConfigured";
   return "admin.disconnected";
+}
+
+function displayUsername(value: string | null | undefined): string {
+  const trimmed = (value ?? "").trim().replace(/^@/, "");
+  return trimmed ? `@${trimmed}` : "";
+}
+
+function normalizeUsername(value: string | null | undefined): string {
+  return (value ?? "").trim().replace(/^@/, "").toLowerCase();
 }
 
 function AgencySettings() {
@@ -76,12 +88,28 @@ function AgencySettings() {
     }
   }
 
+  const callbackUsername = displayUsername(params.get("username"));
+  const storedUsername = displayUsername(data?.username);
+  const shownUsername = storedUsername || callbackUsername;
+  const target = data?.targetUsername || "adpilot.ae";
+  const usernameDiffers =
+    Boolean(shownUsername) && normalizeUsername(shownUsername) !== normalizeUsername(target);
+
   return (
     <Shell admin>
       <h1 className="serif text-4xl">{t("admin.settings")}</h1>
       <p className="mt-4 max-w-3xl text-[var(--muted)]">{t("admin.instagramIntro")}</p>
-      {params.get("instagram") === "connected" ? (
+      {params.get("instagram") === "connected" && shownUsername ? (
+        <p className="mt-4 text-sm text-[var(--ok)]">
+          {t("admin.connectedAs", { username: shownUsername })}
+        </p>
+      ) : params.get("instagram") === "connected" ? (
         <p className="mt-4 text-sm text-[var(--ok)]">{t("admin.connected")}</p>
+      ) : null}
+      {usernameDiffers ? (
+        <p className="mt-3 text-sm text-[var(--muted)]">
+          {t("admin.usernameNote", { username: shownUsername, target: `@${target}` })}
+        </p>
       ) : null}
       {error ? <p className="mt-4 text-sm text-[var(--danger)]">{error}</p> : null}
       {data ? (
@@ -90,10 +118,26 @@ function AgencySettings() {
             <h2 className="text-xs uppercase tracking-[0.18em] text-[var(--gold)]">
               {t("admin.instagramTitle")}
             </h2>
+            <p className="mt-3 text-sm">{t("admin.loginUnified")}</p>
             <p className="mt-3 text-sm">{t(statusKey(data.status))}</p>
+            {data.status === "not_configured" ? (
+              <div className="mt-4 rounded-2xl bg-black/25 p-4 text-sm">
+                <p>{t("admin.addSecrets", { names: data.missingSecrets.join(", "), uri: data.redirectUri })}</p>
+                <ul className="mt-3 space-y-1 font-mono text-xs">
+                  {data.missingSecrets.map((name) => (
+                    <li key={name}>{name}</li>
+                  ))}
+                </ul>
+                <code className="mt-3 block break-all rounded-xl bg-black/30 px-3 py-2 text-xs">
+                  {data.redirectUri}
+                </code>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-[var(--muted)]">{t("admin.startOnHosted")}</p>
+            )}
             {data.lastError ? <p className="mt-2 text-sm text-[var(--danger)]">{data.lastError}</p> : null}
             <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-              <Field label={t("admin.username")} value={data.username || "—"} />
+              <Field label={t("admin.username")} value={storedUsername || "—"} />
               <Field label={t("admin.accountId")} value={data.igUserId || "—"} />
               <Field label={t("admin.accountType")} value={data.accountType || data.name || "—"} />
               <Field
@@ -108,6 +152,7 @@ function AgencySettings() {
                 label={t("admin.expiresAt")}
                 value={data.tokenExpiresAt ? new Date(data.tokenExpiresAt).toLocaleString() : "—"}
               />
+              <Field label={t("admin.redirectUri")} value={data.redirectUri} />
             </dl>
             <div className="mt-6 flex flex-wrap gap-3">
               <button
@@ -152,7 +197,7 @@ function AgencySettings() {
               <li>{t("admin.setup6")}</li>
             </ol>
             <p className="mt-4 text-xs text-[var(--muted)]">
-              {t("admin.redirectUri")}: {data.publicOrigin}
+              {t("admin.redirectUri")}: {data.redirectUri}
             </p>
           </section>
         </>

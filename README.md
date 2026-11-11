@@ -19,11 +19,14 @@ Sign in with the account printed by `npm run demo`. Paid generation stays off.
 
 Agency Instagram publishing uses one professional account that only an administrator connects in `/admin/settings`. Customers never connect Instagram. A finished ad is posted only after customer approval and an explicit admin Publish action. Live Instagram post IDs and insights are stored only when Meta returns them.
 
+Agency Instagram uses Meta Unified Login (Facebook Login for Business with a configuration id). The OAuth callback is exactly `https://adpilot.apps.grok.bot/api/admin/instagram/callback`. Start Connect while signed in on the hosted app.
+
 Optional Instagram secrets (add in Cursor secrets, never paste values into chat):
 
-- `META_APP_ID` — Instagram app ID from the Meta app Instagram product
-- `META_APP_SECRET` — Instagram app secret
-- `META_PUBLIC_ORIGIN` — public `https://` origin used for the OAuth redirect URI and for Instagram to fetch creatives (required for a real post; `http://127.0.0.1` cannot be fetched by Meta)
+- `META_APP_ID` — Meta app ID
+- `META_APP_SECRET` — Meta app secret
+- `META_CONFIGURATION_ID` — Unified Login configuration id (`config_id`)
+- `META_PUBLIC_ORIGIN` — must be `https://adpilot.apps.grok.bot` (OAuth redirect origin and the public HTTPS origin Instagram uses to fetch creatives)
 
 ## Run locally
 

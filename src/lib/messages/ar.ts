@@ -172,7 +172,13 @@ export const ar: typeof en = {
     instagramIntro:
       "يملك محمد يونس حساب إنستغرام احترافياً واحداً. كل إعلان عميل موافق عليه يُنشر عبر ذلك الحساب فقط. لا يُطلب من العملاء ربط إنستغرام.",
     notConfigured:
-      "META_APP_ID وMETA_APP_SECRET غير موجودين على الخادم. أضفهما في أسرار Cursor (وليس في المحادثة). زر الربط يبقى جاهزاً ولا يدّعي أنه متصل.",
+      "أضف أسرار Cursor الأربعة ثم اربط إنستغرام: META_APP_ID وMETA_APP_SECRET وMETA_CONFIGURATION_ID وMETA_PUBLIC_ORIGIN. عنوان إعادة التوجيه: https://adpilot.apps.grok.bot/api/admin/instagram/callback. زر الربط يبقى معطّلاً ولا يدّعي أنه متصل.",
+    addSecrets: "أضف أسرار Cursor هذه ثم اربط إنستغرام: {names}. عنوان إعادة التوجيه: {uri}",
+    loginUnified: "تسجيل الدخول الموحّد من ميتا (Facebook Login for Business)",
+    connectedAs: "متصل باسم {username}",
+    usernameNote: "أعادت ميتا {username}. الحساب المستهدف للوكالة هو {target}.",
+    startOnHosted:
+      "ابدأ الربط وأنت مسجّل الدخول على https://adpilot.apps.grok.bot/admin/settings حتى تعود ميتا إلى عنوان الاستدعاء.",
     disconnected: "غير متصل",
     connected: "متصل",
     expired: "انتهت صلاحية الرمز",
@@ -186,14 +192,19 @@ export const ar: typeof en = {
     redirectUri: "عنوان إعادة توجيه OAuth",
     connect: "ربط إنستغرام",
     disconnect: "قطع الاتصال",
-    refresh: "تحديث الرمز والصلاحيات",
-    setupTitle: "إعدادات تطبيق ميتا التي يجب أن ينشئها محمد",
-    setup1: "أنشئ تطبيقاً في developers.facebook.com وأضف منتج إنستغرام (إعداد الواجهة مع تسجيل دخول إنستغرام).",
-    setup2: "في أسرار Cursor أضف META_APP_ID وMETA_APP_SECRET من ذلك المنتج. لا تلصق القيم في المحادثة.",
+    refresh: "تحديث الحساب والصلاحيات",
+    setupTitle: "إعدادات تسجيل الدخول الموحّد التي يجب أن يكملها محمد",
+    setup1:
+      "في تطبيق ميتا استخدم Facebook Login for Business (التسجيل الموحّد). أنشئ إعداد تسجيل دخول وانسخ معرّف الإعداد.",
+    setup2:
+      "في أسرار Cursor أضف META_APP_ID وMETA_APP_SECRET وMETA_CONFIGURATION_ID وMETA_PUBLIC_ORIGIN بقيمة https://adpilot.apps.grok.bot. لا تلصق القيم في المحادثة.",
     setup3: "أضف عنوان إعادة التوجيه الظاهر هنا كـ Valid OAuth Redirect URI في تطبيق ميتا.",
-    setup4: "اطلب instagram_business_basic وinstagram_business_content_publish وinstagram_business_manage_insights.",
-    setup5: "استخدم حساب إنستغرام الاحترافي لمحمد فقط. في وضع التطوير أضفه كمختبر إن طلبت ميتا ذلك.",
-    setup6: "بعد الربط تحقق من اسم المستخدم والصلاحيات هنا. لا تنشر حتى يؤكد محمد صراحة منشوراً تجريبياً.",
+    setup4:
+      "في إعداد التسجيل الموحّد أدرج صلاحيات إنستغرام لحساب احترافي. لا تستخدم منتج تسجيل دخول إنستغرام الأقدم لهذا الربط.",
+    setup5:
+      "اربط حساب إنستغرام الاحترافي للوكالة @adpilot.ae. إذا أعادت ميتا اسماً آخر فستظهر إعدادات الوكالة ذلك الاسم الحقيقي.",
+    setup6:
+      "بعد الربط تحقق من اسم المستخدم وحالة الاتصال هنا. النشر يبقى خلف زر النشر الصريح. لا تنشر من هذه الصفحة.",
     queueEmpty: "لا إعلانات في الانتظار. يوافق العميل على الإعلان النهائي أولاً ثم يظهر هنا.",
     authorize: "تفويض النشر",
     revokeAuth: "سحب التفويض",

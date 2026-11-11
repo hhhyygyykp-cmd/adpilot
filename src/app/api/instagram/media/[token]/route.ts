@@ -15,7 +15,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ token: str
         "content-type": granted.mime_type,
         "cache-control": "private, no-store",
         "x-content-type-options": "nosniff",
-        "content-disposition": `inline; filename="${granted.original_name.replace(/"/g, "")}"`,
+        "content-disposition": `inline; filename="${granted.original_name.replace(/[\r\n"]/g, "")}"`,
       },
     });
   } catch {

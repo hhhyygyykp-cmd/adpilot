@@ -169,7 +169,14 @@ export const en = {
     instagramIntro:
       "Mohammad Younes owns the one professional Instagram account. Every approved customer ad publishes only through that account. Customers are never asked to connect Instagram.",
     notConfigured:
-      "META_APP_ID and META_APP_SECRET are not on the server. Add those names in Cursor secrets (not in chat). Connect Instagram stays ready and does not pretend to be connected.",
+      "Add these four Cursor secrets, then connect Instagram: META_APP_ID, META_APP_SECRET, META_CONFIGURATION_ID, META_PUBLIC_ORIGIN. Redirect URI: https://adpilot.apps.grok.bot/api/admin/instagram/callback. Connect stays disabled and does not pretend to be connected.",
+    addSecrets:
+      "Add these Cursor secrets, then connect Instagram: {names}. Redirect URI: {uri}",
+    loginUnified: "Meta Unified Login (Facebook Login for Business)",
+    connectedAs: "Connected as {username}",
+    usernameNote: "Meta returned {username}. The target agency account is {target}.",
+    startOnHosted:
+      "Start Connect while signed in at https://adpilot.apps.grok.bot/admin/settings so Meta can return to the callback URL.",
     disconnected: "Not connected",
     connected: "Connected",
     expired: "Token expired",
@@ -183,14 +190,19 @@ export const en = {
     redirectUri: "OAuth redirect URI",
     connect: "Connect Instagram",
     disconnect: "Disconnect",
-    refresh: "Refresh token and permissions",
-    setupTitle: "Meta app settings Mohammad must create",
-    setup1: "Create a Meta app at developers.facebook.com and add the Instagram product (API setup with Instagram login).",
-    setup2: "In Cursor secrets, add META_APP_ID and META_APP_SECRET from that Instagram product. Do not paste the values into chat.",
-    setup3: "Add the redirect URI shown here as a Valid OAuth Redirect URI in the Meta app.",
-    setup4: "Request instagram_business_basic, instagram_business_content_publish, and instagram_business_manage_insights.",
-    setup5: "Use Mohammad’s Instagram professional account only. In Development mode, add that account as an app tester if Meta requires it.",
-    setup6: "After connecting, verify username and permissions here. Do not publish until Mohammad explicitly confirms a demo post.",
+    refresh: "Refresh account and permissions",
+    setupTitle: "Meta Unified Login settings Mohammad must finish",
+    setup1:
+      "In the Meta app, use Facebook Login for Business (Unified Login). Create a login configuration and copy its configuration id.",
+    setup2:
+      "In Cursor secrets, add META_APP_ID, META_APP_SECRET, META_CONFIGURATION_ID, and META_PUBLIC_ORIGIN set to https://adpilot.apps.grok.bot. Do not paste the values into chat.",
+    setup3: "Add this Valid OAuth Redirect URI in the Meta app.",
+    setup4:
+      "In the Unified Login configuration, include Instagram permissions for a professional account. Do not use the older Instagram Login product for this connection.",
+    setup5:
+      "Connect the agency Instagram professional account @adpilot.ae. If Meta returns a different username, Agency Settings will show that real username.",
+    setup6:
+      "After connecting, verify the username and connection status here. Publishing stays behind the explicit Publish click. Do not post from this page.",
     queueEmpty: "No advertisements are waiting. Customers approve a finished ad first; then it appears here.",
     authorize: "Authorize publication",
     revokeAuth: "Revoke authorization",
