@@ -10,6 +10,7 @@ struct AdPilotApp: App {
                 .environmentObject(model)
                 .environment(\.layoutDirection, model.language == "ar" ? .rightToLeft : .leftToRight)
                 .tint(AppColor.primary)
+                .preferredColorScheme(.dark)
                 .background(AppColor.background)
                 .task { await model.restore() }
         }
@@ -66,6 +67,8 @@ struct MainTabs: View {
             BusinessTab().tag(3).tabItem { Label(Copy.text("Business", "العمل", language: model.language), systemImage: "building.2") }
             AccountView().tag(4).tabItem { Label(Copy.text("Account", "الحساب", language: model.language), systemImage: "person") }
         }
+        .toolbarBackground(AppColor.background, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
     }
 
     private var tab: Binding<Int> {

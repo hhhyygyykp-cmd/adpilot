@@ -84,12 +84,17 @@ private struct AppButtonStyle: ButtonStyle {
         configuration.label
             .padding(.horizontal, horizontalPadding)
             .foregroundStyle(foreground)
-            .background(background)
+            .background {
+                if role == .primary {
+                    Capsule().fill(AppColor.brandGradient)
+                } else {
+                    Capsule().fill(background)
+                }
+            }
             .overlay(
-                RoundedRectangle(cornerRadius: AppRadius.button, style: .continuous)
-                    .stroke(border, lineWidth: 1)
+                Capsule().stroke(border, lineWidth: role == .outline ? 1 : 0)
             )
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.button, style: .continuous))
+            .clipShape(Capsule())
             .opacity(configuration.isPressed ? 0.82 : (isEnabled ? 1 : 0.45))
     }
 
