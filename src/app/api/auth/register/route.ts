@@ -10,9 +10,11 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   if (isBrowserRequest(request) && !sameOrigin(request)) return errorJson("Forbidden origin", 403);
-  const limited = rateLimit(clientKey(request, "register"), 8, 15 * 60 * 1000);
-  if (!limited.ok) {
-    return errorJson("Too many attempts. Try again shortly.", 429);
+  const ipHour = await rateLimit(clientKey(request, "register:hour"), 3, 60 * 60 * 1000);
+  const ipDay = await rateLimit(clientKey(request, "register:day"), 8, 24 * 60 * 60 * 1000);
+  const globalDay = await rateLimit("register:global:day", 20, 24 * 60 * 60 * 1000);
+  if (!ipHour.ok || !ipDay.ok || !globalDay.ok) {
+    return errorJson("Too many accounts created from this network. Try again later.", 429);
   }
   const body = await readJson<{
     email?: string;

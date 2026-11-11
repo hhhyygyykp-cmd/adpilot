@@ -201,6 +201,11 @@ test("OAuth state validation rejects missing and unknown states", async () => {
   assert.match(unknownUrl.searchParams.get("error") || "", /expired|Connect Instagram again/i);
 });
 
+test("Instagram media grants reject short unguessable tokens", async () => {
+  const missing = await api("GET", "/api/instagram/media/short");
+  assert.equal(missing.status, 404);
+});
+
 test("publishing permission checks refuse to post", async () => {
   const admin = await registerOrLogin("demo@adpilot.local", "DemoPass123", "Demo Owner");
   const graphCalls = [];

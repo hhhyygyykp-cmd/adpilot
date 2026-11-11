@@ -52,7 +52,7 @@ export class OpenAiLlmProvider implements LlmProvider {
     const key = process.env.OPENAI_API_KEY?.trim();
     if (!key) return null;
     const actor = input.business?.customerId || "shared";
-    const limited = rateLimit(`openai:${actor}`, 40, 60 * 60 * 1000);
+    const limited = await rateLimit(`openai:${actor}`, 40, 60 * 60 * 1000);
     if (!limited.ok) return null;
     const businessContext = input.business
       ? `Business: ${input.business.name}. Products/services: ${input.business.productsServices}. Goals: ${input.business.marketingGoals}.`
