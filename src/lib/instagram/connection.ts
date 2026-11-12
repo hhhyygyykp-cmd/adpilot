@@ -238,7 +238,7 @@ async function storeConnection(input: {
 
 export async function completeInstagramOAuth(input: {
   request: Request;
-  adminCustomerId: string;
+  adminCustomerId?: string | null;
   code: string | null;
   state: string | null;
   oauthError: string | null;
@@ -257,9 +257,10 @@ export async function completeInstagramOAuth(input: {
   );
   const expected = states[0];
   if (!expected) return { error: "This Instagram connection link expired. Start Connect Instagram again.", status: 400 };
-  if (expected.admin_customer_id !== input.adminCustomerId) {
+  if (input.adminCustomerId && expected.admin_customer_id !== input.adminCustomerId) {
     return { error: "Sign in as the same administrator who started Connect Instagram.", status: 403 };
   }
+  const adminCustomerId = expected.admin_customer_id;
   if (!metaConfigured()) {
     return {
       error: `Add these Cursor secrets, then connect Instagram: ${missingMetaSecrets().join(", ")}. Redirect URI: ${HOSTED_CALLBACK}`,
@@ -272,7 +273,7 @@ export async function completeInstagramOAuth(input: {
       redirectUri: instagramRedirectUri(),
     });
     const saved = await storeConnection({
-      adminCustomerId: input.adminCustomerId,
+      adminCustomerId,
       token: exchanged.accessToken,
       expiresIn: exchanged.expiresIn,
       permissions: exchanged.permissions,

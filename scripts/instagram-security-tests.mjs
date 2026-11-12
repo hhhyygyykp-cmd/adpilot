@@ -6,6 +6,7 @@ import {
   HOSTED_ORIGIN,
   REQUIRED_SECRET_NAMES,
   buildAuthorizationUrl,
+  instagramAppReturnUrl,
   jsonContainsTokenLeak,
   missingMetaSecretsFrom,
   selectAgencyAccount,
@@ -260,27 +261,22 @@ test("admin Instagram status never returns the access token", async () => {
   assert.equal(/IGQW-|EAA[A-Za-z0-9]+/.test(serialized), false);
 });
 
-test("OAuth state validation rejects missing and unknown states", async () => {
-  const admin = await registerOrLogin("demo@adpilot.local", "DemoPass123", "Demo Owner");
-  const missing = await api("GET", "/api/admin/instagram/callback?code=fake-code", {
-    token: admin.token,
-  });
-  assert.ok([302, 303, 307, 308].includes(missing.status));
-  assert.ok(missing.location);
-  const missingUrl = new URL(missing.location);
-  assert.equal(missingUrl.origin + missingUrl.pathname, `${HOSTED_ORIGIN}/admin/settings`);
-  assert.equal(missingUrl.searchParams.get("instagram"), "error");
-  assert.match(missingUrl.searchParams.get("error") || "", /authorization code|expired|Connect/i);
+test("OAuth callback returns to the AdPilot app, not the website settings page", async () => {
+  const expected = new URL(instagramAppReturnUrl({ status: "error", error: "Meta did not return an authorization code." }));
+  assert.equal(expected.protocol, "adpilot:");
+  assert.equal(expected.host, "instagram");
 
-  const unknown = await api(
-    "GET",
-    "/api/admin/instagram/callback?code=fake-code&state=not-a-stored-state",
-    { token: admin.token },
-  );
-  assert.ok([302, 303, 307, 308].includes(unknown.status));
-  const unknownUrl = new URL(unknown.location);
-  assert.equal(unknownUrl.searchParams.get("instagram"), "error");
-  assert.match(unknownUrl.searchParams.get("error") || "", /expired|Connect Instagram again/i);
+  const missing = await api("GET", "/api/admin/instagram/callback?code=fake-code");
+  assert.equal(missing.status, 200);
+  assert.match(missing.text, /adpilot:\/\/instagram/);
+  assert.match(missing.text, /authorization code|expired|Connect/i);
+  assert.equal(missing.text.includes("/admin/settings"), false);
+  assert.equal(/IGQW-|EAA[A-Za-z0-9]+/.test(missing.text), false);
+
+  const unknown = await api("GET", "/api/admin/instagram/callback?code=fake-code&state=not-a-stored-state");
+  assert.equal(unknown.status, 200);
+  assert.match(unknown.text, /adpilot:\/\/instagram/);
+  assert.match(unknown.text, /expired|Connect Instagram again/i);
 });
 
 test("Instagram media grants reject short unguessable tokens", async () => {
