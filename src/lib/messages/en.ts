@@ -183,6 +183,7 @@ export const en = {
     needsReauth: "Needs reconnect",
     username: "Username",
     accountId: "Instagram account id",
+    profileName: "Profile name",
     accountType: "Account type",
     permissions: "Granted permissions",
     connectedAt: "Connected",

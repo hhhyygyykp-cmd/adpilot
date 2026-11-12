@@ -164,8 +164,27 @@ async function storeConnection(input: {
       "Meta did not share any Instagram professional account. Select the agency account during Unified Login.",
     );
   }
-  const profile = await fetchInstagramProfile(input.token, selected.id);
-  const username = profile.username || selected.username;
+  let profile = {
+    id: selected.id,
+    userId: selected.id,
+    username: selected.username,
+    accountType: "",
+    name: "",
+  };
+  try {
+    const live = await fetchInstagramProfile(input.token, selected.id);
+    profile = {
+      ...live,
+      username: live.username || selected.username,
+    };
+  } catch {
+    if (!selected.username) {
+      throw new Error(
+        "Meta shared an Instagram account id but did not return a username. Connect again and select @adpilot.ae.",
+      );
+    }
+  }
+  const username = profile.username;
   const granted = input.permissions.length
     ? input.permissions
     : (await listGrantedPermissions(input.token)) || [...UNIFIED_PERMISSIONS];
@@ -309,7 +328,22 @@ export async function refreshInstagramConnection(adminCustomerId: string): Promi
     if (!selected) {
       throw new Error("Meta no longer shares an Instagram professional account for this token.");
     }
-    const profile = await fetchInstagramProfile(live.token, selected.id);
+    let profile = {
+      id: selected.id,
+      userId: selected.id,
+      username: selected.username,
+      accountType: "",
+      name: "",
+    };
+    try {
+      const liveProfile = await fetchInstagramProfile(live.token, selected.id);
+      profile = {
+        ...liveProfile,
+        username: liveProfile.username || selected.username,
+      };
+    } catch {
+      if (!selected.username) throw new Error("Meta no longer shares the Instagram username for this token.");
+    }
     const permissions = (await listGrantedPermissions(live.token)) || [];
     await sql(
       `update agency_social_accounts set
