@@ -18,7 +18,7 @@ export async function handleFalRoute(request: Request, kind: FalKind) {
       return json({ job, budget: await falBudget(auth.customer.id) });
     }
     const rule = FAL_RATE_LIMITS[kind];
-    const limited = rateLimit(clientKey(request, `fal:${kind}:${auth.customer.id}`), rule.limit, rule.windowMs);
+    const limited = await rateLimit(clientKey(request, `fal:${kind}:${auth.customer.id}`), rule.limit, rule.windowMs);
     if (!limited.ok) return errorJson("Too many generations. Try again shortly.", 429);
     const body = await readJson(request);
     const job = await startFalGeneration(auth.customer.id, kind, body);

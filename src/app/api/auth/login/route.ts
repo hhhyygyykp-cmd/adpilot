@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   if (isBrowserRequest(request) && !sameOrigin(request)) return errorJson("Forbidden origin", 403);
   const body = await readJson<{ email?: string; password?: string }>(request);
   const email = (body?.email ?? "").trim().toLowerCase();
-  const limited = rateLimit(clientKey(request, `login:${email}`), 8, 15 * 60 * 1000);
+  const limited = await rateLimit(clientKey(request, `login:${email}`), 8, 15 * 60 * 1000);
   if (!limited.ok) return errorJson("Too many attempts. Try again shortly.", 429);
   const customer = await authenticate(email, body?.password ?? "");
   if (!customer) return errorJson("Email or password is incorrect", 401);

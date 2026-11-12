@@ -185,6 +185,7 @@ export const ar: typeof en = {
     needsReauth: "يحتاج إعادة ربط",
     username: "اسم المستخدم",
     accountId: "معرّف حساب إنستغرام",
+    profileName: "اسم الملف",
     accountType: "نوع الحساب",
     permissions: "الصلاحيات الممنوحة",
     connectedAt: "تاريخ الربط",

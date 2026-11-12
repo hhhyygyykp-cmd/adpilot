@@ -10,6 +10,13 @@ import {
   missingMetaSecretsFrom,
   selectAgencyAccount,
 } from "../src/lib/instagram/oauth.ts";
+import {
+  collectDiscoveredInstagramAccounts,
+  igUserProfileFields,
+  nonexistingFieldFromGraphError,
+  readIgUserProfile,
+  withoutGraphField,
+} from "../src/lib/instagram/discovery.ts";
 
 const BASE = process.env.ADPILOT_URL ?? "http://127.0.0.1:3000";
 
@@ -45,15 +52,14 @@ async function registerOrLogin(email, password, name) {
     sessions.set(email, registered.data);
     return registered.data;
   }
-  if (registered.status !== 409) {
-    throw new Error(`register ${email} failed (${registered.status}): ${registered.data.error || ""}`);
-  }
   const loggedIn = await api("POST", "/api/auth/login", { body: { email, password } });
-  if ((loggedIn.status !== 200 && loggedIn.status !== 201) || !loggedIn.data.token) {
-    throw new Error(`login ${email} failed (${loggedIn.status}): ${loggedIn.data.error || ""}`);
+  if ((loggedIn.status === 200 || loggedIn.status === 201) && loggedIn.data.token) {
+    sessions.set(email, loggedIn.data);
+    return loggedIn.data;
   }
-  sessions.set(email, loggedIn.data);
-  return loggedIn.data;
+  throw new Error(
+    `auth ${email} failed (register ${registered.status}: ${registered.data.error || ""}; login ${loggedIn.status}: ${loggedIn.data.error || ""})`,
+  );
 }
 
 test("Unified Login callback and secret names are exact", () => {
@@ -92,6 +98,82 @@ test("OAuth URL uses configuration_id and the hosted callback, not Instagram Log
   assert.equal(url.searchParams.get("redirect_uri"), HOSTED_CALLBACK);
   assert.equal(url.searchParams.get("response_type"), "code");
   assert.equal(url.searchParams.has("scope"), false);
+});
+
+test("Facebook Graph IG User profile fields omit Instagram Login account_type", () => {
+  assert.equal(igUserProfileFields(), "id,username,name");
+  assert.equal(igUserProfileFields(["account_type", "user_id", "website"]).includes("account_type"), false);
+  assert.equal(igUserProfileFields(["account_type", "user_id"]).includes("user_id"), false);
+  assert.equal(
+    nonexistingFieldFromGraphError("(#100) Tried accessing nonexisting field (account_type)"),
+    "account_type",
+  );
+  assert.equal(withoutGraphField("id,username,name,account_type", "account_type"), "id,username,name");
+});
+
+test("default Unified Login profile request never asks Graph for account_type", async () => {
+  const requested = [];
+  const profile = await readIgUserProfile({
+    igUserId: "17841405822304914",
+    get: async (_path, fields) => {
+      requested.push(fields);
+      if (fields.split(",").includes("account_type")) {
+        throw new Error("(#100) Tried accessing nonexisting field (account_type)");
+      }
+      return { id: "17841405822304914", username: "adpilot.ae", name: "Adpilot" };
+    },
+  });
+  assert.deepEqual(requested, ["id,username,name"]);
+  assert.equal(profile.username, "adpilot.ae");
+  assert.equal(profile.id, "17841405822304914");
+});
+
+test("IG User profile read retries when Graph rejects an optional field", async () => {
+  const requested = [];
+  const profile = await readIgUserProfile({
+    igUserId: "17841405822304914",
+    fields: "id,username,name,account_type",
+    get: async (path, fields) => {
+      requested.push({ path, fields });
+      if (fields.split(",").includes("account_type")) {
+        throw new Error("(#100) Tried accessing nonexisting field (account_type)");
+      }
+      return { id: "17841405822304914", username: "adpilot.ae", name: "Adpilot" };
+    },
+  });
+  assert.equal(profile.username, "adpilot.ae");
+  assert.equal(profile.id, "17841405822304914");
+  assert.equal(requested[0].path, "/17841405822304914");
+  assert.equal(requested[0].fields.includes("account_type"), true);
+  assert.equal(requested.at(-1).fields.includes("account_type"), false);
+  assert.equal(requested.at(-1).fields.includes("id"), true);
+  assert.equal(requested.at(-1).fields.includes("username"), true);
+});
+
+test("Account discovery uses assigned IG User ids, not Facebook or portfolio ids", () => {
+  const accounts = collectDiscoveredInstagramAccounts({
+    assigned: [{ id: "17841405822304914", username: "adpilot.ae" }],
+    pages: [
+      {
+        id: "134895793791914",
+        instagram_business_account: { id: "17841405822304914", username: "adpilot.ae" },
+      },
+    ],
+    me: {
+      id: "system-user-facebook-id",
+      client_business_id: "business-portfolio-id",
+      instagram_business_account: { id: "17841409999999999", username: "other.shop" },
+    },
+  });
+  assert.deepEqual(
+    accounts.map((item) => item.id).sort(),
+    ["17841405822304914", "17841409999999999"],
+  );
+  assert.equal(
+    accounts.some((item) => item.id === "system-user-facebook-id" || item.id === "business-portfolio-id"),
+    false,
+  );
+  assert.equal(selectAgencyAccount(accounts)?.username, "adpilot.ae");
 });
 
 test("Agency account picker keeps Meta's real username", () => {
@@ -199,6 +281,11 @@ test("OAuth state validation rejects missing and unknown states", async () => {
   const unknownUrl = new URL(unknown.location);
   assert.equal(unknownUrl.searchParams.get("instagram"), "error");
   assert.match(unknownUrl.searchParams.get("error") || "", /expired|Connect Instagram again/i);
+});
+
+test("Instagram media grants reject short unguessable tokens", async () => {
+  const missing = await api("GET", "/api/instagram/media/short");
+  assert.equal(missing.status, 404);
 });
 
 test("publishing permission checks refuse to post", async () => {
