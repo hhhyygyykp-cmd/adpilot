@@ -218,6 +218,7 @@ export const ar: typeof en = {
     publishStatus: "حالة النشر",
     requested: "التاريخ المطلوب",
     preview: "معاينة الإعلان",
+    destination: "وجهة إنستغرام",
     livePost: "منشور إنستغرام الحي",
     noLivePost: "لا يوجد معرّف منشور محفوظ. لن نختلق نشراً ناجحاً.",
     insightsRefresh: "تحديث الرؤى",

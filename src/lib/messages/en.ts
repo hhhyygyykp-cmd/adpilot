@@ -216,6 +216,7 @@ export const en = {
     publishStatus: "Publishing status",
     requested: "Requested date",
     preview: "Ad preview",
+    destination: "Instagram destination",
     livePost: "Live Instagram post",
     noLivePost: "No Instagram post id is stored. A successful publish is never faked.",
     insightsRefresh: "Refresh insights",
