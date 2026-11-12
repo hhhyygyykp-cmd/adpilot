@@ -11,6 +11,9 @@ final class AppModel: ObservableObject {
     @Published var tab = 0
     @Published var busy = false
     @Published var errorMessage: String?
+    @Published var queue: [QueueItem] = []
+    @Published var queueDestination: QueueDestination?
+    @Published var agencyInstagram: AgencyInstagram?
 
     var api = APIClient()
     var language: String { customer?.preferredLanguage ?? "en" }
@@ -23,7 +26,10 @@ final class AppModel: ObservableObject {
             let me: MePayload = try await api.send("GET", "/api/auth/me")
             customer = me.customer
             if me.customer == nil { signOutLocal() }
-            else { await refreshLists() }
+            else {
+                await refreshLists()
+                if customer?.isAdmin == true { await loadAgencyQueue() }
+            }
         } catch {
             signOutLocal()
         }
@@ -242,6 +248,98 @@ final class AppModel: ObservableObject {
         try await api.data("GET", "/api/creatives/\(id)")
     }
 
+    func loadAgencyQueue() async {
+        guard customer?.isAdmin == true else { return }
+        do {
+            let instagram: AgencyInstagramPayload = try await api.send("GET", "/api/admin/instagram")
+            agencyInstagram = instagram.instagram
+            let payload: QueuePayload = try await api.send("GET", "/api/admin/instagram/publications")
+            queue = payload.publications
+            queueDestination = payload.destination
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func connectInstagram() async {
+        guard customer?.isAdmin == true else { return }
+        do {
+            busy = true
+            defer { busy = false }
+            let payload: ConnectPayload = try await api.send("POST", "/api/admin/instagram/connect", body: [:])
+            guard let url = URL(string: payload.url) else {
+                errorMessage = "Meta did not return a login URL."
+                return
+            }
+            UIApplication.shared.open(url)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func disconnectInstagram() async {
+        guard customer?.isAdmin == true else { return }
+        do {
+            busy = true
+            defer { busy = false }
+            let payload: AgencyInstagramPayload = try await api.send(
+                "POST",
+                "/api/admin/instagram",
+                body: ["action": "disconnect"]
+            )
+            agencyInstagram = payload.instagram
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func refreshInstagram() async {
+        guard customer?.isAdmin == true else { return }
+        do {
+            busy = true
+            defer { busy = false }
+            let payload: AgencyInstagramPayload = try await api.send(
+                "POST",
+                "/api/admin/instagram",
+                body: ["action": "refresh"]
+            )
+            agencyInstagram = payload.instagram
+            await loadAgencyQueue()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func handleIncomingURL(_ url: URL) {
+        guard url.scheme == "adpilot", url.host == "instagram" else { return }
+        if customer?.isAdmin == true { tab = 5 }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let status = items.first(where: { $0.name == "instagram" })?.value
+        let error = items.first(where: { $0.name == "error" })?.value
+        if status == "connected" {
+            errorMessage = nil
+        } else if let error, !error.isEmpty {
+            errorMessage = error
+        }
+        Task { await loadAgencyQueue() }
+    }
+
+    func authorizeQueueItem(_ id: String, caption: String) async {
+        guard customer?.isAdmin == true else { return }
+        do {
+            busy = true
+            defer { busy = false }
+            let _: PublicationActionPayload = try await api.send(
+                "POST",
+                "/api/admin/instagram/publications/\(id)",
+                body: ["action": "authorize", "caption": caption]
+            )
+            await loadAgencyQueue()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     var activeBusiness: Business? {
         businesses.first { $0.isActive } ?? businesses.first
     }
@@ -261,6 +359,7 @@ final class AppModel: ObservableObject {
             Keychain.session = StoredSession(token: token, csrf: csrf)
             customer = payload.customer
             await refreshLists()
+            if customer?.isAdmin == true { await loadAgencyQueue() }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -274,6 +373,9 @@ final class AppModel: ObservableObject {
         businesses = []
         campaigns = []
         campaign = nil
+        queue = []
+        queueDestination = nil
+        agencyInstagram = nil
         tab = 0
     }
 }

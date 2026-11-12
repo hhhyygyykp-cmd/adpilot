@@ -3,7 +3,7 @@ import "server-only";
 import { newId } from "../crypto";
 import { sql } from "../db";
 import { redactFalMessage } from "./fal-key";
-import { testingBudgetUsd, type FalKind } from "./fal-models";
+import { globalTestingBudgetUsd, testingBudgetUsd, type FalKind } from "./fal-models";
 
 export type FalJobStatus = "queued" | "in_progress" | "completed" | "failed";
 
@@ -44,17 +44,23 @@ export async function reserveFalJob(input: {
   const id = newId();
   const rows = await sql<Row>(
     `with spent as (
-       select coalesce(sum(cost_usd), 0)::numeric as total
-       from fal_generations
-       where customer_id = $1
-         and status in ('queued', 'in_progress', 'completed')
+       select
+         coalesce((
+           select sum(cost_usd) from fal_generations
+           where customer_id = $1 and status in ('queued', 'in_progress', 'completed')
+         ), 0)::numeric as customer_total,
+         coalesce((
+           select sum(cost_usd) from fal_generations
+           where status in ('queued', 'in_progress', 'completed')
+         ), 0)::numeric as global_total
      )
      insert into fal_generations (
        id, customer_id, kind, model_id, prompt, settings, status, cost_usd
      )
      select $2, $1, $3, $4, $5, $6::jsonb, 'queued', $7
      from spent
-     where spent.total + $7::numeric <= $8::numeric
+     where spent.customer_total + $7::numeric <= $8::numeric
+       and spent.global_total + $7::numeric <= $9::numeric
      returning id, kind, model_id, prompt, status, request_id, media_urls, cost_usd, error, created_at`,
     [
       input.customerId,
@@ -65,6 +71,7 @@ export async function reserveFalJob(input: {
       JSON.stringify(input.settings),
       input.costUsd,
       testingBudgetUsd(),
+      globalTestingBudgetUsd(),
     ],
   );
   return rows[0] ? mapJob(rows[0]) : null;

@@ -3,7 +3,20 @@ export const FACEBOOK_GRAPH_HOST = "https://graph.facebook.com";
 export const FACEBOOK_OAUTH_DIALOG = `https://www.facebook.com/${FACEBOOK_GRAPH_VERSION}/dialog/oauth`;
 export const HOSTED_ORIGIN = "https://adpilot.apps.grok.bot";
 export const HOSTED_CALLBACK = `${HOSTED_ORIGIN}/api/admin/instagram/callback`;
+export const APP_URL_SCHEME = "adpilot";
 export const TARGET_INSTAGRAM_USERNAME = "adpilot.ae";
+
+export function instagramAppReturnUrl(input: {
+  status: string;
+  username?: string | null;
+  error?: string | null;
+}): string {
+  const url = new URL(`${APP_URL_SCHEME}://instagram`);
+  url.searchParams.set("instagram", input.status);
+  if (input.username?.trim()) url.searchParams.set("username", input.username.trim().replace(/^@/, ""));
+  if (input.error?.trim()) url.searchParams.set("error", input.error.trim().slice(0, 180));
+  return url.toString();
+}
 
 export const UNIFIED_PERMISSIONS = [
   "instagram_basic",

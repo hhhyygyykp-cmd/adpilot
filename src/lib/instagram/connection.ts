@@ -164,8 +164,27 @@ async function storeConnection(input: {
       "Meta did not share any Instagram professional account. Select the agency account during Unified Login.",
     );
   }
-  const profile = await fetchInstagramProfile(input.token, selected.id);
-  const username = profile.username || selected.username;
+  let profile = {
+    id: selected.id,
+    userId: selected.id,
+    username: selected.username,
+    accountType: "",
+    name: "",
+  };
+  try {
+    const live = await fetchInstagramProfile(input.token, selected.id);
+    profile = {
+      ...live,
+      username: live.username || selected.username,
+    };
+  } catch {
+    if (!selected.username) {
+      throw new Error(
+        "Meta shared an Instagram account id but did not return a username. Connect again and select @adpilot.ae.",
+      );
+    }
+  }
+  const username = profile.username;
   const granted = input.permissions.length
     ? input.permissions
     : (await listGrantedPermissions(input.token)) || [...UNIFIED_PERMISSIONS];
@@ -219,7 +238,7 @@ async function storeConnection(input: {
 
 export async function completeInstagramOAuth(input: {
   request: Request;
-  adminCustomerId: string;
+  adminCustomerId?: string | null;
   code: string | null;
   state: string | null;
   oauthError: string | null;
@@ -238,9 +257,10 @@ export async function completeInstagramOAuth(input: {
   );
   const expected = states[0];
   if (!expected) return { error: "This Instagram connection link expired. Start Connect Instagram again.", status: 400 };
-  if (expected.admin_customer_id !== input.adminCustomerId) {
+  if (input.adminCustomerId && expected.admin_customer_id !== input.adminCustomerId) {
     return { error: "Sign in as the same administrator who started Connect Instagram.", status: 403 };
   }
+  const adminCustomerId = expected.admin_customer_id;
   if (!metaConfigured()) {
     return {
       error: `Add these Cursor secrets, then connect Instagram: ${missingMetaSecrets().join(", ")}. Redirect URI: ${HOSTED_CALLBACK}`,
@@ -253,7 +273,7 @@ export async function completeInstagramOAuth(input: {
       redirectUri: instagramRedirectUri(),
     });
     const saved = await storeConnection({
-      adminCustomerId: input.adminCustomerId,
+      adminCustomerId,
       token: exchanged.accessToken,
       expiresIn: exchanged.expiresIn,
       permissions: exchanged.permissions,
@@ -309,7 +329,22 @@ export async function refreshInstagramConnection(adminCustomerId: string): Promi
     if (!selected) {
       throw new Error("Meta no longer shares an Instagram professional account for this token.");
     }
-    const profile = await fetchInstagramProfile(live.token, selected.id);
+    let profile = {
+      id: selected.id,
+      userId: selected.id,
+      username: selected.username,
+      accountType: "",
+      name: "",
+    };
+    try {
+      const liveProfile = await fetchInstagramProfile(live.token, selected.id);
+      profile = {
+        ...liveProfile,
+        username: liveProfile.username || selected.username,
+      };
+    } catch {
+      if (!selected.username) throw new Error("Meta no longer shares the Instagram username for this token.");
+    }
     const permissions = (await listGrantedPermissions(live.token)) || [];
     await sql(
       `update agency_social_accounts set
