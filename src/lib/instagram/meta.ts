@@ -9,6 +9,11 @@ import {
   metaAppSecret,
   metaConfigurationId,
 } from "./config";
+import {
+  collectDiscoveredInstagramAccounts,
+  igUserProfileFields,
+  readIgUserProfile,
+} from "./discovery";
 import { buildAuthorizationUrl, type InstagramAccount } from "./oauth";
 
 export class InstagramApiError extends Error {
@@ -247,18 +252,6 @@ export async function listGrantedPermissions(token: string): Promise<string[]> {
 
 export type { InstagramAccount };
 
-function collectAccount(
-  byId: Map<string, InstagramAccount>,
-  id?: string,
-  username?: string,
-) {
-  if (!id) return;
-  const name = username?.trim() || "";
-  const existing = byId.get(id);
-  if (!existing) byId.set(id, { id, username: name });
-  else if (!existing.username && name) existing.username = name;
-}
-
 async function paginateGraph<T>(
   token: string,
   path: string,
@@ -291,53 +284,60 @@ export async function listAssignedInstagramAccounts(token: string): Promise<Inst
   return accounts;
 }
 
-export async function listPageInstagramAccounts(token: string): Promise<InstagramAccount[]> {
-  const accounts: InstagramAccount[] = [];
+export async function listPageInstagramAccounts(token: string): Promise<
+  Array<{ id?: string; instagram_business_account?: { id?: string; username?: string } }>
+> {
+  const pages: Array<{
+    id?: string;
+    instagram_business_account?: { id?: string; username?: string };
+  }> = [];
   await paginateGraph<{
+    id?: string;
     instagram_business_account?: { id?: string; username?: string };
   }>(token, "/me/accounts", "id,name,instagram_business_account{id,username}", (row) => {
-    const ig = row.instagram_business_account;
-    if (ig?.id) accounts.push({ id: String(ig.id), username: ig.username?.trim() || "" });
+    pages.push(row);
   });
-  return accounts;
+  return pages;
 }
 
 export async function listAvailableInstagramAccounts(token: string): Promise<InstagramAccount[]> {
-  const byId = new Map<string, InstagramAccount>();
+  let assigned: InstagramAccount[] = [];
+  let pages: Array<{ id?: string; instagram_business_account?: { id?: string; username?: string } }> =
+    [];
+  let me: {
+    id?: string;
+    client_business_id?: string;
+    instagram_business_account?: { id?: string; username?: string };
+  } | null = null;
   try {
-    for (const row of await listAssignedInstagramAccounts(token)) {
-      collectAccount(byId, row.id, row.username);
-    }
+    assigned = await listAssignedInstagramAccounts(token);
   } catch {
-    // User tokens from Unified Login often have Pages instead of assigned accounts.
+    // Facebook user tokens may expose Pages instead of assigned accounts.
   }
   try {
-    for (const row of await listPageInstagramAccounts(token)) {
-      collectAccount(byId, row.id, row.username);
-    }
+    pages = await listPageInstagramAccounts(token);
   } catch {
-    // System-user tokens may not expose /me/accounts.
+    // Business Integration System User tokens often have no /me/accounts.
   }
   try {
-    const me = await instagramGet<{
+    me = await instagramGet<{
+      id?: string;
+      client_business_id?: string;
       instagram_business_account?: { id?: string; username?: string };
-    }>("/me", token, { fields: "instagram_business_account{id,username}" });
-    collectAccount(
-      byId,
-      me.instagram_business_account?.id,
-      me.instagram_business_account?.username,
-    );
+    }>("/me", token, {
+      fields: "id,client_business_id,instagram_business_account{id,username}",
+    });
   } catch {
-    // Not every token type exposes this field.
+    // /me is the system user or Facebook user, not an Instagram professional account.
   }
-  const accounts = [...byId.values()];
+  const accounts = collectDiscoveredInstagramAccounts({ assigned, pages, me });
   for (const account of accounts) {
     if (account.username) continue;
     try {
       const profile = await fetchInstagramProfile(token, account.id);
       account.username = profile.username;
     } catch {
-      // Keep the id; Agency Settings will show whatever Meta returned.
+      // Keep the Graph IG User id; Agency Settings will show whatever Meta returned.
     }
   }
   return accounts;
@@ -354,22 +354,19 @@ export type InstagramProfile = {
 };
 
 export async function fetchInstagramProfile(token: string, igUserId: string): Promise<InstagramProfile> {
-  const body = await instagramGet<{
-    id?: string;
-    username?: string;
-    name?: string;
-    account_type?: string;
-  }>(`/${igUserId}`, token, {
-    fields: "id,username,name,account_type",
+  const profile = await readIgUserProfile({
+    igUserId,
+    fields: igUserProfileFields(),
+    get: async (path, fields) =>
+      instagramGet<Record<string, unknown>>(path, token, { fields }),
   });
-  const id = String(body.id || igUserId);
-  if (!id) throw new InstagramApiError("Instagram did not return a professional account id.");
+  if (!profile.id) throw new InstagramApiError("Instagram did not return a professional account id.");
   return {
-    id,
-    userId: id,
-    username: body.username?.trim() || "",
-    accountType: body.account_type?.trim() || "",
-    name: body.name?.trim() || "",
+    id: profile.id,
+    userId: profile.id,
+    username: profile.username,
+    accountType: "",
+    name: profile.name,
   };
 }
 
