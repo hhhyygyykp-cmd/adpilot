@@ -52,6 +52,14 @@ export function testingBudgetUsd(): number {
   return Math.min(value, 100);
 }
 
+export function globalTestingBudgetUsd(): number {
+  const raw = process.env.FAL_GLOBAL_BUDGET_USD?.trim();
+  if (!raw) return testingBudgetUsd();
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) return testingBudgetUsd();
+  return Math.min(value, 500);
+}
+
 export function imageCost(size: ImageSizeName | { width: number; height: number }, count: number): number {
   const megapixels =
     typeof size === "string" ? MEGAPIXELS[size] : (size.width * size.height) / 1_000_000;

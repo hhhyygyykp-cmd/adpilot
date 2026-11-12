@@ -3,6 +3,7 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { newId } from "./crypto";
+import { sql } from "./db";
 
 const ALLOWED = new Map([
   ["image/jpeg", "jpg"],
@@ -42,6 +43,18 @@ export async function saveGenerated(input: {
   return writeBytes(input.customerId, input.buffer, ext, input.mimeType);
 }
 
+function diskRoot(): string {
+  return path.join(process.cwd(), "data", "uploads");
+}
+
+function asBuffer(value: unknown): Buffer | null {
+  if (!value) return null;
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof Uint8Array) return Buffer.from(value);
+  if (typeof value === "string") return Buffer.from(value, "base64");
+  return null;
+}
+
 async function writeBytes(
   customerId: string,
   buffer: Buffer,
@@ -49,9 +62,18 @@ async function writeBytes(
   mimeType: string,
 ): Promise<{ storageKey: string; mimeType: string }> {
   const key = `${customerId}/${newId()}.${ext}`;
-  const full = path.join(process.cwd(), "data", "uploads", key);
-  await mkdir(path.dirname(full), { recursive: true });
-  await writeFile(full, buffer);
+  await sql(
+    `insert into media_objects (storage_key, mime_type, byte_size, bytes)
+     values ($1, $2, $3, $4)`,
+    [key, mimeType, buffer.byteLength, buffer],
+  );
+  try {
+    const full = path.join(diskRoot(), key);
+    await mkdir(path.dirname(full), { recursive: true });
+    await writeFile(full, buffer);
+  } catch {
+    // Hosted runtimes may not allow a local uploads directory. Postgres is enough.
+  }
   return { storageKey: key, mimeType };
 }
 
@@ -63,8 +85,14 @@ export async function readUpload(storageKey: string): Promise<Buffer> {
   ) {
     throw new Error("invalid_key");
   }
-  const full = path.join(process.cwd(), "data", "uploads", storageKey);
-  const root = path.join(process.cwd(), "data", "uploads") + path.sep;
+  const rows = await sql<{ bytes: unknown }>(
+    `select bytes from media_objects where storage_key = $1 limit 1`,
+    [storageKey],
+  );
+  const fromDb = asBuffer(rows[0]?.bytes);
+  if (fromDb) return fromDb;
+  const full = path.join(diskRoot(), storageKey);
+  const root = diskRoot() + path.sep;
   if (!full.startsWith(root)) throw new Error("invalid_key");
   return readFile(full);
 }
