@@ -10,11 +10,13 @@ export function instagramAppReturnUrl(input: {
   status: string;
   username?: string | null;
   error?: string | null;
+  state?: string | null;
 }): string {
   const url = new URL(`${APP_URL_SCHEME}://instagram`);
   url.searchParams.set("instagram", input.status);
   if (input.username?.trim()) url.searchParams.set("username", input.username.trim().replace(/^@/, ""));
   if (input.error?.trim()) url.searchParams.set("error", input.error.trim().slice(0, 180));
+  if (input.state?.trim()) url.searchParams.set("state", input.state.trim().slice(0, 128));
   return url.toString();
 }
 

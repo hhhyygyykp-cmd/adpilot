@@ -50,6 +50,13 @@ struct AuthView: View {
                     text: $password,
                     isSecure: true
                 )
+                Text(Copy.text(
+                    "If OpenAI is enabled, AdPilot may send brief text you type to OpenAI to extract campaign fields. This is optional; AdPilot works without it.",
+                    "إذا فُعّل OpenAI، قد يُرسل أدبايلوت نص الملخص الذي تكتبه إلى OpenAI لاستخراج حقول الحملة. هذا اختياري؛ يعمل أدبايلوت بدونه.",
+                    language: language
+                ))
+                .font(AppFont.caption)
+                .foregroundStyle(AppColor.mutedForeground)
                 if let error = model.errorMessage, !error.isEmpty {
                     Text(error)
                         .font(AppFont.caption)
@@ -413,6 +420,13 @@ struct CreateAdView: View {
         Text(campaign.title)
             .font(AppFont.screenTitle)
             .foregroundStyle(AppColor.foreground)
+        Text(Copy.text(
+            "If OpenAI is enabled, AdPilot may send this brief to OpenAI to extract campaign fields. This is optional; AdPilot works without it.",
+            "إذا فُعّل OpenAI، قد يُرسل أدبايلوت هذا الملخص إلى OpenAI لاستخراج حقول الحملة. هذا اختياري؛ يعمل أدبايلوت بدونه.",
+            language: model.language
+        ))
+        .font(AppFont.caption)
+        .foregroundStyle(AppColor.mutedForeground)
         ForEach(campaign.conversation) { message in
             ChatBubble(text: message.text, isUser: message.role == "customer")
         }
@@ -1292,6 +1306,13 @@ struct AccountView: View {
                             model.tab = 5
                         }
                     }
+                    Text(Copy.text(
+                        "If OpenAI is enabled, brief text you type may be sent to OpenAI to extract campaign fields. This is optional; AdPilot works without it.",
+                        "إذا فُعّل OpenAI، قد يُرسل نص الملخص الذي تكتبه إلى OpenAI لاستخراج حقول الحملة. هذا اختياري؛ يعمل أدبايلوت بدونه.",
+                        language: model.language
+                    ))
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.mutedForeground)
                     Text(Copy.text(
                         "Customers create and approve ads in this app. An administrator authorizes the agency Instagram account. Nothing is posted until Publish is confirmed.",
                         "العملاء ينشئون الإعلانات ويوافقون عليها في هذا التطبيق. المسؤول يفوّض حساب إنستغرام الخاص بالوكالة. لا يُنشر شيء حتى يتم تأكيد النشر.",

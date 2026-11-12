@@ -1,4 +1,4 @@
-import { completeInstagramOAuth } from "@/lib/instagram/connection";
+import { receiveInstagramOAuthCallback } from "@/lib/instagram/connection";
 import { instagramAppReturnUrl } from "@/lib/instagram/oauth";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +11,17 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function appHandoff(input: { status: string; username?: string | null; error?: string | null }) {
+function appHandoff(input: {
+  status: string;
+  username?: string | null;
+  error?: string | null;
+  state?: string | null;
+}) {
   const href = instagramAppReturnUrl(input);
   const message =
     input.error?.trim() ||
-    (input.status === "connected"
-      ? "Instagram is connected. Returning to the AdPilot app."
+    (input.status === "pending"
+      ? "Instagram login finished. Returning to the AdPilot app to complete linking."
       : "Return to the AdPilot app to finish Instagram linking.");
   const html = `<!doctype html>
 <html lang="en">
@@ -42,8 +47,7 @@ function appHandoff(input: { status: string; username?: string | null; error?: s
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const result = await completeInstagramOAuth({
-    request,
+  const result = await receiveInstagramOAuthCallback({
     code: url.searchParams.get("code"),
     state: url.searchParams.get("state"),
     oauthError:
@@ -55,5 +59,5 @@ export async function GET(request: Request) {
   if ("error" in result) {
     return appHandoff({ status: "error", error: result.error });
   }
-  return appHandoff({ status: "connected", username: result.username });
+  return appHandoff({ status: "pending", state: result.state });
 }

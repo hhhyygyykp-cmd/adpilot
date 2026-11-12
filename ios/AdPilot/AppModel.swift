@@ -14,6 +14,7 @@ final class AppModel: ObservableObject {
     @Published var queue: [QueueItem] = []
     @Published var queueDestination: QueueDestination?
     @Published var agencyInstagram: AgencyInstagram?
+    private var pendingInstagramState: String?
 
     var api = APIClient()
     var language: String { customer?.preferredLanguage ?? "en" }
@@ -28,7 +29,10 @@ final class AppModel: ObservableObject {
             if me.customer == nil { signOutLocal() }
             else {
                 await refreshLists()
-                if customer?.isAdmin == true { await loadAgencyQueue() }
+                if customer?.isAdmin == true {
+                    await loadAgencyQueue()
+                    await finishPendingInstagramConnect()
+                }
             }
         } catch {
             signOutLocal()
@@ -316,12 +320,42 @@ final class AppModel: ObservableObject {
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let status = items.first(where: { $0.name == "instagram" })?.value
         let error = items.first(where: { $0.name == "error" })?.value
+        let state = items.first(where: { $0.name == "state" })?.value
+        if status == "pending", let state, !state.isEmpty {
+            pendingInstagramState = state
+            errorMessage = nil
+            Task { await finishPendingInstagramConnect() }
+            return
+        }
         if status == "connected" {
             errorMessage = nil
         } else if let error, !error.isEmpty {
             errorMessage = error
         }
         Task { await loadAgencyQueue() }
+    }
+
+    func completeInstagramConnect(_ state: String) async {
+        guard customer?.isAdmin == true else { return }
+        do {
+            busy = true
+            defer { busy = false }
+            let payload: AgencyInstagramPayload = try await api.send(
+                "POST",
+                "/api/admin/instagram/complete",
+                body: ["state": state]
+            )
+            agencyInstagram = payload.instagram
+            await loadAgencyQueue()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func finishPendingInstagramConnect() async {
+        guard customer?.isAdmin == true, let state = pendingInstagramState, !state.isEmpty else { return }
+        pendingInstagramState = nil
+        await completeInstagramConnect(state)
     }
 
     func authorizeQueueItem(_ id: String, caption: String) async {
@@ -359,7 +393,10 @@ final class AppModel: ObservableObject {
             Keychain.session = StoredSession(token: token, csrf: csrf)
             customer = payload.customer
             await refreshLists()
-            if customer?.isAdmin == true { await loadAgencyQueue() }
+            if customer?.isAdmin == true {
+                await loadAgencyQueue()
+                await finishPendingInstagramConnect()
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -376,6 +413,7 @@ final class AppModel: ObservableObject {
         queue = []
         queueDestination = nil
         agencyInstagram = nil
+        pendingInstagramState = nil
         tab = 0
     }
 }

@@ -236,31 +236,69 @@ async function storeConnection(input: {
   return { username };
 }
 
-export async function completeInstagramOAuth(input: {
-  request: Request;
-  adminCustomerId?: string | null;
+export async function receiveInstagramOAuthCallback(input: {
   code: string | null;
   state: string | null;
   oauthError: string | null;
-}): Promise<{ ok: true; username: string } | { error: string; status: number }> {
+}): Promise<{ ok: true; state: string } | { error: string; status: number }> {
   if (input.oauthError) {
     return { error: `Instagram authorization was not completed (${input.oauthError}).`, status: 400 };
   }
   if (!input.code || !input.state) {
     return { error: "Meta did not return an authorization code.", status: 400 };
   }
-  const states = await sql<{ admin_customer_id: string }>(
-    `delete from instagram_oauth_states
-     where state = $1 and expires_at > now()
-     returning admin_customer_id`,
+  if (input.code.length > 2048 || input.state.length > 128) {
+    return { error: "This Instagram connection link is invalid.", status: 400 };
+  }
+  const rows = await sql<{ state: string; authorization_code: string | null }>(
+    `select state, authorization_code from instagram_oauth_states
+     where state = $1 and expires_at > now()`,
     [input.state],
   );
-  const expected = states[0];
+  const row = rows[0];
+  if (!row) return { error: "This Instagram connection link expired. Start Connect Instagram again.", status: 400 };
+  if (!row.authorization_code) {
+    await sql(
+      `update instagram_oauth_states
+       set authorization_code = $2
+       where state = $1 and authorization_code is null`,
+      [input.state, input.code],
+    );
+  }
+  return { ok: true, state: row.state };
+}
+
+export async function completeInstagramOAuth(input: {
+  adminCustomerId: string;
+  state: string | null;
+}): Promise<{ ok: true; username: string } | { error: string; status: number }> {
+  if (!input.adminCustomerId) {
+    return { error: "Sign in as an administrator to finish Instagram linking.", status: 401 };
+  }
+  if (!input.state) {
+    return { error: "This Instagram connection link expired. Start Connect Instagram again.", status: 400 };
+  }
+  const pending = await sql<{ admin_customer_id: string; authorization_code: string | null }>(
+    `select admin_customer_id, authorization_code from instagram_oauth_states
+     where state = $1 and expires_at > now()`,
+    [input.state],
+  );
+  const expected = pending[0];
   if (!expected) return { error: "This Instagram connection link expired. Start Connect Instagram again.", status: 400 };
-  if (input.adminCustomerId && expected.admin_customer_id !== input.adminCustomerId) {
+  if (expected.admin_customer_id !== input.adminCustomerId) {
     return { error: "Sign in as the same administrator who started Connect Instagram.", status: 403 };
   }
-  const adminCustomerId = expected.admin_customer_id;
+  if (!expected.authorization_code) {
+    return { error: "Finish Instagram login, then return to the AdPilot app.", status: 400 };
+  }
+  const consumed = await sql<{ authorization_code: string }>(
+    `delete from instagram_oauth_states
+     where state = $1 and admin_customer_id = $2 and authorization_code is not null
+     returning authorization_code`,
+    [input.state, input.adminCustomerId],
+  );
+  const code = consumed[0]?.authorization_code;
+  if (!code) return { error: "This Instagram connection link expired. Start Connect Instagram again.", status: 400 };
   if (!metaConfigured()) {
     return {
       error: `Add these Cursor secrets, then connect Instagram: ${missingMetaSecrets().join(", ")}. Redirect URI: ${HOSTED_CALLBACK}`,
@@ -269,11 +307,11 @@ export async function completeInstagramOAuth(input: {
   }
   try {
     const exchanged = await exchangeAuthorizationCode({
-      code: input.code,
+      code,
       redirectUri: instagramRedirectUri(),
     });
     const saved = await storeConnection({
-      adminCustomerId,
+      adminCustomerId: input.adminCustomerId,
       token: exchanged.accessToken,
       expiresIn: exchanged.expiresIn,
       permissions: exchanged.permissions,

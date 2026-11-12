@@ -66,6 +66,7 @@ function CreateAd() {
     <Shell>
       <p className="text-xs uppercase tracking-[0.22em] text-[var(--gold)]">{t("create.title")}</p>
       <p className="mt-2 text-sm text-[var(--muted)]">{t("create.refreshSafe")}</p>
+      <p className="mt-2 text-xs text-[var(--muted)]">{t("create.openaiNotice")}</p>
       {error ? <p className="mt-4 text-sm text-[var(--danger)]">{error}</p> : null}
       {loading ? <p className="mt-8 text-[var(--muted)]">{t("common.loading")}</p> : null}
       {!loading && !campaign ? (

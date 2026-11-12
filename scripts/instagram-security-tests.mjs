@@ -203,6 +203,8 @@ test("auth: unauthenticated callers cannot use admin Instagram routes", async ()
   assert.equal(get.status, 401);
   const connect = await api("POST", "/api/admin/instagram/connect", { body: {} });
   assert.equal(connect.status, 401);
+  const complete = await api("POST", "/api/admin/instagram/complete", { body: { state: "x" } });
+  assert.equal(complete.status, 401);
   const publish = await api("POST", "/api/admin/instagram/publications/not-a-real-id", {
     body: { action: "publish" },
   });
@@ -227,6 +229,12 @@ test("authorization: customers cannot connect, inspect, or publish the agency ac
     body: {},
   });
   assert.equal(connect.status, 403);
+  const complete = await api("POST", "/api/admin/instagram/complete", {
+    token: customer.token,
+    csrf: customer.csrf,
+    body: { state: "x" },
+  });
+  assert.equal(complete.status, 403);
   const publish = await api("POST", "/api/admin/instagram/publications/not-a-real-id", {
     token: customer.token,
     csrf: customer.csrf,
@@ -261,22 +269,40 @@ test("admin Instagram status never returns the access token", async () => {
   assert.equal(/IGQW-|EAA[A-Za-z0-9]+/.test(serialized), false);
 });
 
-test("OAuth callback returns to the AdPilot app, not the website settings page", async () => {
+test("OAuth callback returns to the AdPilot app and does not finish linking without an admin session", async () => {
   const expected = new URL(instagramAppReturnUrl({ status: "error", error: "Meta did not return an authorization code." }));
   assert.equal(expected.protocol, "adpilot:");
   assert.equal(expected.host, "instagram");
 
-  const missing = await api("GET", "/api/admin/instagram/callback?code=fake-code");
+  const stolen = "steal-this-authorization-code";
+  const missing = await api("GET", `/api/admin/instagram/callback?code=${stolen}`);
   assert.equal(missing.status, 200);
   assert.match(missing.text, /adpilot:\/\/instagram/);
   assert.match(missing.text, /authorization code|expired|Connect/i);
   assert.equal(missing.text.includes("/admin/settings"), false);
+  assert.equal(missing.text.includes(stolen), false);
   assert.equal(/IGQW-|EAA[A-Za-z0-9]+/.test(missing.text), false);
 
-  const unknown = await api("GET", "/api/admin/instagram/callback?code=fake-code&state=not-a-stored-state");
+  const unknown = await api("GET", `/api/admin/instagram/callback?code=${stolen}&state=not-a-stored-state`);
   assert.equal(unknown.status, 200);
   assert.match(unknown.text, /adpilot:\/\/instagram/);
   assert.match(unknown.text, /expired|Connect Instagram again/i);
+  assert.equal(unknown.text.includes(stolen), false);
+
+  const admin = await registerOrLogin("demo@adpilot.local", "DemoPass123", "Demo Owner");
+  const before = await api("GET", "/api/admin/instagram", { token: admin.token, csrf: admin.csrf });
+  assert.equal(before.data.instagram?.status === "connected", false);
+  const after = await api("GET", `/api/admin/instagram/callback?code=${stolen}&state=not-a-stored-state`);
+  assert.equal(after.status, 200);
+  const still = await api("GET", "/api/admin/instagram", { token: admin.token, csrf: admin.csrf });
+  assert.equal(still.data.instagram?.status === "connected", false);
+
+  const completeUnknown = await api("POST", "/api/admin/instagram/complete", {
+    token: admin.token,
+    csrf: admin.csrf,
+    body: { state: "not-a-stored-state" },
+  });
+  assert.equal(completeUnknown.status, 400);
 });
 
 test("Instagram media grants reject short unguessable tokens", async () => {
