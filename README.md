@@ -43,6 +43,7 @@ Optional:
 
 - `ADMIN_EMAILS` — comma-separated administrator emails (never auto-promotes the first user)
 - `OPENAI_API_KEY` — optional LLM interpretation; without it a structured conversation engine is used
+- `FAL_GLOBAL_BUDGET_USD` — optional ceiling for all fal spend on this server (defaults to the per-account testing budget so extra signups cannot multiply cost)
 
 ## Scripts
 

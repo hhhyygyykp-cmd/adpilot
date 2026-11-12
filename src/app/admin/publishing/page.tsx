@@ -31,13 +31,24 @@ type Row = {
 export default function AdminPublishingPage() {
   const { t } = useSession();
   const [rows, setRows] = useState<Row[]>([]);
+  const [destination, setDestination] = useState<{ username: string | null; igUserId: string | null }>({
+    username: null,
+    igUserId: null,
+  });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [captions, setCaptions] = useState<Record<string, string>>({});
 
   async function load() {
-    const data = await api<{ publications: Row[] }>("/api/admin/instagram/publications");
+    const data = await api<{
+      publications: Row[];
+      destination?: { username: string | null; igUserId: string | null };
+    }>("/api/admin/instagram/publications");
     setRows(data.publications);
+    setDestination({
+      username: data.destination?.username ?? null,
+      igUserId: data.destination?.igUserId ?? null,
+    });
     setCaptions(
       Object.fromEntries(data.publications.map((item) => [item.id, item.caption])),
     );
@@ -108,6 +119,15 @@ export default function AdminPublishingPage() {
                   <dd>{row.requestedAt ? new Date(row.requestedAt).toLocaleString() : "—"}</dd>
                 </div>
               </dl>
+              <p className="mt-4 text-sm">
+                {t("admin.destination")}:{" "}
+                <span className="font-medium">
+                  {destination.username ? `@${destination.username.replace(/^@/, "")}` : "—"}
+                </span>
+                {destination.igUserId ? (
+                  <span className="text-[var(--muted)]"> · {destination.igUserId}</span>
+                ) : null}
+              </p>
               <p className="mt-4 text-xs uppercase tracking-[0.14em] text-[var(--gold)]">{t("admin.preview")}</p>
               {row.kind === "video" ? (
                 <video src={`/api/creatives/${row.creativeId}`} controls playsInline className="mt-2 max-h-80 w-full rounded-2xl" />

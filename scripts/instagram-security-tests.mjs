@@ -6,10 +6,18 @@ import {
   HOSTED_ORIGIN,
   REQUIRED_SECRET_NAMES,
   buildAuthorizationUrl,
+  instagramAppReturnUrl,
   jsonContainsTokenLeak,
   missingMetaSecretsFrom,
   selectAgencyAccount,
 } from "../src/lib/instagram/oauth.ts";
+import {
+  collectDiscoveredInstagramAccounts,
+  igUserProfileFields,
+  nonexistingFieldFromGraphError,
+  readIgUserProfile,
+  withoutGraphField,
+} from "../src/lib/instagram/discovery.ts";
 
 const BASE = process.env.ADPILOT_URL ?? "http://127.0.0.1:3000";
 
@@ -45,15 +53,14 @@ async function registerOrLogin(email, password, name) {
     sessions.set(email, registered.data);
     return registered.data;
   }
-  if (registered.status !== 409) {
-    throw new Error(`register ${email} failed (${registered.status}): ${registered.data.error || ""}`);
-  }
   const loggedIn = await api("POST", "/api/auth/login", { body: { email, password } });
-  if ((loggedIn.status !== 200 && loggedIn.status !== 201) || !loggedIn.data.token) {
-    throw new Error(`login ${email} failed (${loggedIn.status}): ${loggedIn.data.error || ""}`);
+  if ((loggedIn.status === 200 || loggedIn.status === 201) && loggedIn.data.token) {
+    sessions.set(email, loggedIn.data);
+    return loggedIn.data;
   }
-  sessions.set(email, loggedIn.data);
-  return loggedIn.data;
+  throw new Error(
+    `auth ${email} failed (register ${registered.status}: ${registered.data.error || ""}; login ${loggedIn.status}: ${loggedIn.data.error || ""})`,
+  );
 }
 
 test("Unified Login callback and secret names are exact", () => {
@@ -94,6 +101,82 @@ test("OAuth URL uses configuration_id and the hosted callback, not Instagram Log
   assert.equal(url.searchParams.has("scope"), false);
 });
 
+test("Facebook Graph IG User profile fields omit Instagram Login account_type", () => {
+  assert.equal(igUserProfileFields(), "id,username,name");
+  assert.equal(igUserProfileFields(["account_type", "user_id", "website"]).includes("account_type"), false);
+  assert.equal(igUserProfileFields(["account_type", "user_id"]).includes("user_id"), false);
+  assert.equal(
+    nonexistingFieldFromGraphError("(#100) Tried accessing nonexisting field (account_type)"),
+    "account_type",
+  );
+  assert.equal(withoutGraphField("id,username,name,account_type", "account_type"), "id,username,name");
+});
+
+test("default Unified Login profile request never asks Graph for account_type", async () => {
+  const requested = [];
+  const profile = await readIgUserProfile({
+    igUserId: "17841405822304914",
+    get: async (_path, fields) => {
+      requested.push(fields);
+      if (fields.split(",").includes("account_type")) {
+        throw new Error("(#100) Tried accessing nonexisting field (account_type)");
+      }
+      return { id: "17841405822304914", username: "adpilot.ae", name: "Adpilot" };
+    },
+  });
+  assert.deepEqual(requested, ["id,username,name"]);
+  assert.equal(profile.username, "adpilot.ae");
+  assert.equal(profile.id, "17841405822304914");
+});
+
+test("IG User profile read retries when Graph rejects an optional field", async () => {
+  const requested = [];
+  const profile = await readIgUserProfile({
+    igUserId: "17841405822304914",
+    fields: "id,username,name,account_type",
+    get: async (path, fields) => {
+      requested.push({ path, fields });
+      if (fields.split(",").includes("account_type")) {
+        throw new Error("(#100) Tried accessing nonexisting field (account_type)");
+      }
+      return { id: "17841405822304914", username: "adpilot.ae", name: "Adpilot" };
+    },
+  });
+  assert.equal(profile.username, "adpilot.ae");
+  assert.equal(profile.id, "17841405822304914");
+  assert.equal(requested[0].path, "/17841405822304914");
+  assert.equal(requested[0].fields.includes("account_type"), true);
+  assert.equal(requested.at(-1).fields.includes("account_type"), false);
+  assert.equal(requested.at(-1).fields.includes("id"), true);
+  assert.equal(requested.at(-1).fields.includes("username"), true);
+});
+
+test("Account discovery uses assigned IG User ids, not Facebook or portfolio ids", () => {
+  const accounts = collectDiscoveredInstagramAccounts({
+    assigned: [{ id: "17841405822304914", username: "adpilot.ae" }],
+    pages: [
+      {
+        id: "134895793791914",
+        instagram_business_account: { id: "17841405822304914", username: "adpilot.ae" },
+      },
+    ],
+    me: {
+      id: "system-user-facebook-id",
+      client_business_id: "business-portfolio-id",
+      instagram_business_account: { id: "17841409999999999", username: "other.shop" },
+    },
+  });
+  assert.deepEqual(
+    accounts.map((item) => item.id).sort(),
+    ["17841405822304914", "17841409999999999"],
+  );
+  assert.equal(
+    accounts.some((item) => item.id === "system-user-facebook-id" || item.id === "business-portfolio-id"),
+    false,
+  );
+  assert.equal(selectAgencyAccount(accounts)?.username, "adpilot.ae");
+});
+
 test("Agency account picker keeps Meta's real username", () => {
   assert.equal(selectAgencyAccount([]), null);
   const other = selectAgencyAccount([{ id: "1", username: "someone.else" }]);
@@ -120,6 +203,8 @@ test("auth: unauthenticated callers cannot use admin Instagram routes", async ()
   assert.equal(get.status, 401);
   const connect = await api("POST", "/api/admin/instagram/connect", { body: {} });
   assert.equal(connect.status, 401);
+  const complete = await api("POST", "/api/admin/instagram/complete", { body: { state: "x" } });
+  assert.equal(complete.status, 401);
   const publish = await api("POST", "/api/admin/instagram/publications/not-a-real-id", {
     body: { action: "publish" },
   });
@@ -144,6 +229,12 @@ test("authorization: customers cannot connect, inspect, or publish the agency ac
     body: {},
   });
   assert.equal(connect.status, 403);
+  const complete = await api("POST", "/api/admin/instagram/complete", {
+    token: customer.token,
+    csrf: customer.csrf,
+    body: { state: "x" },
+  });
+  assert.equal(complete.status, 403);
   const publish = await api("POST", "/api/admin/instagram/publications/not-a-real-id", {
     token: customer.token,
     csrf: customer.csrf,
@@ -178,27 +269,45 @@ test("admin Instagram status never returns the access token", async () => {
   assert.equal(/IGQW-|EAA[A-Za-z0-9]+/.test(serialized), false);
 });
 
-test("OAuth state validation rejects missing and unknown states", async () => {
-  const admin = await registerOrLogin("demo@adpilot.local", "DemoPass123", "Demo Owner");
-  const missing = await api("GET", "/api/admin/instagram/callback?code=fake-code", {
-    token: admin.token,
-  });
-  assert.ok([302, 303, 307, 308].includes(missing.status));
-  assert.ok(missing.location);
-  const missingUrl = new URL(missing.location);
-  assert.equal(missingUrl.origin + missingUrl.pathname, `${HOSTED_ORIGIN}/admin/settings`);
-  assert.equal(missingUrl.searchParams.get("instagram"), "error");
-  assert.match(missingUrl.searchParams.get("error") || "", /authorization code|expired|Connect/i);
+test("OAuth callback returns to the AdPilot app and does not finish linking without an admin session", async () => {
+  const expected = new URL(instagramAppReturnUrl({ status: "error", error: "Meta did not return an authorization code." }));
+  assert.equal(expected.protocol, "adpilot:");
+  assert.equal(expected.host, "instagram");
 
-  const unknown = await api(
-    "GET",
-    "/api/admin/instagram/callback?code=fake-code&state=not-a-stored-state",
-    { token: admin.token },
-  );
-  assert.ok([302, 303, 307, 308].includes(unknown.status));
-  const unknownUrl = new URL(unknown.location);
-  assert.equal(unknownUrl.searchParams.get("instagram"), "error");
-  assert.match(unknownUrl.searchParams.get("error") || "", /expired|Connect Instagram again/i);
+  const stolen = "steal-this-authorization-code";
+  const missing = await api("GET", `/api/admin/instagram/callback?code=${stolen}`);
+  assert.equal(missing.status, 200);
+  assert.match(missing.text, /adpilot:\/\/instagram/);
+  assert.match(missing.text, /authorization code|expired|Connect/i);
+  assert.equal(missing.text.includes("/admin/settings"), false);
+  assert.equal(missing.text.includes(stolen), false);
+  assert.equal(/IGQW-|EAA[A-Za-z0-9]+/.test(missing.text), false);
+
+  const unknown = await api("GET", `/api/admin/instagram/callback?code=${stolen}&state=not-a-stored-state`);
+  assert.equal(unknown.status, 200);
+  assert.match(unknown.text, /adpilot:\/\/instagram/);
+  assert.match(unknown.text, /expired|Connect Instagram again/i);
+  assert.equal(unknown.text.includes(stolen), false);
+
+  const admin = await registerOrLogin("demo@adpilot.local", "DemoPass123", "Demo Owner");
+  const before = await api("GET", "/api/admin/instagram", { token: admin.token, csrf: admin.csrf });
+  assert.equal(before.data.instagram?.status === "connected", false);
+  const after = await api("GET", `/api/admin/instagram/callback?code=${stolen}&state=not-a-stored-state`);
+  assert.equal(after.status, 200);
+  const still = await api("GET", "/api/admin/instagram", { token: admin.token, csrf: admin.csrf });
+  assert.equal(still.data.instagram?.status === "connected", false);
+
+  const completeUnknown = await api("POST", "/api/admin/instagram/complete", {
+    token: admin.token,
+    csrf: admin.csrf,
+    body: { state: "not-a-stored-state" },
+  });
+  assert.equal(completeUnknown.status, 400);
+});
+
+test("Instagram media grants reject short unguessable tokens", async () => {
+  const missing = await api("GET", "/api/instagram/media/short");
+  assert.equal(missing.status, 404);
 });
 
 test("publishing permission checks refuse to post", async () => {

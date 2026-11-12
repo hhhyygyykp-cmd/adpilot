@@ -8,7 +8,7 @@
     "start": "next start --hostname 127.0.0.1 --port 3000",
     "demo": "node scripts/dev-demo.mjs",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test scripts/instagram-security-tests.mjs"
+    "test": "node --experimental-strip-types --test scripts/instagram-security-tests.mjs scripts/media-security-tests.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.14",

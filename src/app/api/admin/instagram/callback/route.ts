@@ -1,33 +1,53 @@
-import { requireAdmin } from "@/lib/auth";
-import { HOSTED_ORIGIN, hostedOrigin } from "@/lib/instagram/config";
-import { completeInstagramOAuth } from "@/lib/instagram/connection";
+import { receiveInstagramOAuthCallback } from "@/lib/instagram/connection";
+import { instagramAppReturnUrl } from "@/lib/instagram/oauth";
 
 export const dynamic = "force-dynamic";
 
-function settingsUrl(request: Request) {
-  const origin = hostedOrigin() || HOSTED_ORIGIN;
-  try {
-    return new URL("/admin/settings", `${origin}/`);
-  } catch {
-    return new URL("/admin/settings", request.url);
-  }
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function appHandoff(input: {
+  status: string;
+  username?: string | null;
+  error?: string | null;
+  state?: string | null;
+}) {
+  const href = instagramAppReturnUrl(input);
+  const message =
+    input.error?.trim() ||
+    (input.status === "pending"
+      ? "Instagram login finished. Returning to the AdPilot app to complete linking."
+      : "Return to the AdPilot app to finish Instagram linking.");
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AdPilot</title>
+</head>
+<body style="font-family:system-ui,sans-serif;background:#140f1c;color:#fffef8;padding:32px;line-height:1.5">
+  <p>${escapeHtml(message)}</p>
+  <p><a href="${escapeHtml(href)}" style="color:#e6c27a">Open AdPilot</a></p>
+  <script>location.replace(${JSON.stringify(href)});</script>
+</body>
+</html>`;
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "private, no-store",
+    },
+  });
 }
 
 export async function GET(request: Request) {
-  const auth = await requireAdmin(request);
-  const target = settingsUrl(request);
-  if ("error" in auth && auth.error) {
-    target.searchParams.set("instagram", "auth");
-    target.searchParams.set(
-      "error",
-      "Sign in as an administrator on the hosted app, then click Connect Instagram.",
-    );
-    return Response.redirect(target);
-  }
   const url = new URL(request.url);
-  const result = await completeInstagramOAuth({
-    request,
-    adminCustomerId: auth.customer.id,
+  const result = await receiveInstagramOAuthCallback({
     code: url.searchParams.get("code"),
     state: url.searchParams.get("state"),
     oauthError:
@@ -37,11 +57,7 @@ export async function GET(request: Request) {
       url.searchParams.get("error_description"),
   });
   if ("error" in result) {
-    target.searchParams.set("instagram", "error");
-    target.searchParams.set("error", result.error);
-    return Response.redirect(target);
+    return appHandoff({ status: "error", error: result.error });
   }
-  target.searchParams.set("instagram", "connected");
-  if (result.username) target.searchParams.set("username", result.username);
-  return Response.redirect(target);
+  return appHandoff({ status: "pending", state: result.state });
 }

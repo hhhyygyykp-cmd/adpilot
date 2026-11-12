@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const auth = await requireAdmin(request);
   if ("error" in auth && auth.error) return auth.error;
-  const limited = rateLimit(clientKey(request, `ig-connect:${auth.customer.id}`), 8, 10 * 60 * 1000);
+  const limited = await rateLimit(clientKey(request, `ig-connect:${auth.customer.id}`), 8, 10 * 60 * 1000);
   if (!limited.ok) return errorJson("Too many Instagram connect attempts. Try again shortly.", 429);
   const result = await startInstagramOAuth({
     request,

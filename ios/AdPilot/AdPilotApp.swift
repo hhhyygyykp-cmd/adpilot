@@ -13,6 +13,9 @@ struct AdPilotApp: App {
                 .preferredColorScheme(.dark)
                 .background(AppColor.background)
                 .task { await model.restore() }
+                .onOpenURL { url in
+                    model.handleIncomingURL(url)
+                }
         }
     }
 }
@@ -65,6 +68,9 @@ struct MainTabs: View {
             CreateAdView().tag(1).tabItem { Label(Copy.text("Create", "إنشاء", language: model.language), systemImage: "plus.circle") }
             AdsView().tag(2).tabItem { Label(Copy.text("My Ads", "إعلاناتي", language: model.language), systemImage: "photo.on.rectangle") }
             BusinessTab().tag(3).tabItem { Label(Copy.text("Business", "العمل", language: model.language), systemImage: "building.2") }
+            if model.customer?.isAdmin == true {
+                AgencyQueueView().tag(5).tabItem { Label(Copy.text("Queue", "القائمة", language: model.language), systemImage: "tray.full") }
+            }
             AccountView().tag(4).tabItem { Label(Copy.text("Account", "الحساب", language: model.language), systemImage: "person") }
         }
         .toolbarBackground(AppColor.background, for: .tabBar)

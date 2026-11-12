@@ -50,6 +50,13 @@ struct AuthView: View {
                     text: $password,
                     isSecure: true
                 )
+                Text(Copy.text(
+                    "If OpenAI is enabled, AdPilot may send brief text you type to OpenAI to extract campaign fields. This is optional; AdPilot works without it.",
+                    "إذا فُعّل OpenAI، قد يُرسل أدبايلوت نص الملخص الذي تكتبه إلى OpenAI لاستخراج حقول الحملة. هذا اختياري؛ يعمل أدبايلوت بدونه.",
+                    language: language
+                ))
+                .font(AppFont.caption)
+                .foregroundStyle(AppColor.mutedForeground)
                 if let error = model.errorMessage, !error.isEmpty {
                     Text(error)
                         .font(AppFont.caption)
@@ -413,6 +420,13 @@ struct CreateAdView: View {
         Text(campaign.title)
             .font(AppFont.screenTitle)
             .foregroundStyle(AppColor.foreground)
+        Text(Copy.text(
+            "If OpenAI is enabled, AdPilot may send this brief to OpenAI to extract campaign fields. This is optional; AdPilot works without it.",
+            "إذا فُعّل OpenAI، قد يُرسل أدبايلوت هذا الملخص إلى OpenAI لاستخراج حقول الحملة. هذا اختياري؛ يعمل أدبايلوت بدونه.",
+            language: model.language
+        ))
+        .font(AppFont.caption)
+        .foregroundStyle(AppColor.mutedForeground)
         ForEach(campaign.conversation) { message in
             ChatBubble(text: message.text, isUser: message.role == "customer")
         }
@@ -1287,9 +1301,21 @@ struct AccountView: View {
                     AppButton(Copy.text("Sign out", "تسجيل الخروج", language: model.language), role: .ghost) {
                         Task { await model.logout() }
                     }
+                    if model.customer?.isAdmin == true {
+                        AppButton(Copy.text("Open agency queue", "افتح قائمة الوكالة", language: model.language), role: .ghost) {
+                            model.tab = 5
+                        }
+                    }
                     Text(Copy.text(
-                        "Instagram and Facebook publishing, and live ad analytics, are not in this version.",
-                        "نشر إنستغرام وفيسبوك وتحليلات الإعلانات المباشرة ليست في هذا الإصدار.",
+                        "If OpenAI is enabled, brief text you type may be sent to OpenAI to extract campaign fields. This is optional; AdPilot works without it.",
+                        "إذا فُعّل OpenAI، قد يُرسل نص الملخص الذي تكتبه إلى OpenAI لاستخراج حقول الحملة. هذا اختياري؛ يعمل أدبايلوت بدونه.",
+                        language: model.language
+                    ))
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.mutedForeground)
+                    Text(Copy.text(
+                        "Customers create and approve ads in this app. An administrator authorizes the agency Instagram account. Nothing is posted until Publish is confirmed.",
+                        "العملاء ينشئون الإعلانات ويوافقون عليها في هذا التطبيق. المسؤول يفوّض حساب إنستغرام الخاص بالوكالة. لا يُنشر شيء حتى يتم تأكيد النشر.",
                         language: model.language
                     ))
                     .font(AppFont.caption)
@@ -1315,5 +1341,207 @@ struct AccountView: View {
                 }
             }
         )
+    }
+}
+
+struct AgencyQueueView: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppSpacing.lg) {
+                    connectionCard
+                    linkingButtons
+                    if model.queue.isEmpty {
+                        AppEmptyState(
+                            systemImage: "tray",
+                            message: Copy.text(
+                                "No advertisements waiting. Create a still in this app, then Approve. Publish stays off until you confirm.",
+                                "لا إعلانات في الانتظار. أنشئ صورة ثابتة في هذا التطبيق ثم وافق. النشر يبقى متوقفاً حتى تؤكد.",
+                                language: model.language
+                            )
+                        )
+                    } else {
+                        ForEach(model.queue) { item in
+                            queueCard(item)
+                        }
+                    }
+                }
+                .padding(AppSpacing.lg)
+            }
+            .background(AppColor.background)
+            .navigationTitle(Copy.text("Agency Instagram", "إنستغرام الوكالة", language: model.language))
+            .task { await model.loadAgencyQueue() }
+            .refreshable { await model.loadAgencyQueue() }
+        }
+    }
+
+    private var destinationHandle: String {
+        if let name = model.queueDestination?.username, !name.isEmpty {
+            return name.hasPrefix("@") ? name : "@\(name)"
+        }
+        return model.agencyInstagram?.handle ?? "@adpilot.ae"
+    }
+
+    private var connectionCard: some View {
+        let ig = model.agencyInstagram
+        let connected = ig?.status == "connected"
+        let exact = (ig?.username ?? "").replacingOccurrences(of: "@", with: "").lowercased() == "adpilot.ae"
+        let canPublish = ig?.canPublish == true
+        return VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text(Copy.text("Instagram destination", "وجهة إنستغرام", language: model.language))
+                .font(AppFont.caption)
+                .foregroundStyle(AppColor.mutedForeground)
+            Text(destinationHandle)
+                .font(AppFont.title)
+                .foregroundStyle(AppColor.foreground)
+            Text(
+                connected && exact
+                    ? Copy.text("Connected to @adpilot.ae", "متصل بـ @adpilot.ae", language: model.language)
+                    : Copy.text("Not connected to @adpilot.ae", "غير متصل بـ @adpilot.ae", language: model.language)
+            )
+            .font(AppFont.secondary)
+            .foregroundStyle(connected && exact ? AppColor.primary : AppColor.destructive)
+            Text(
+                canPublish
+                    ? Copy.text(
+                        "Content publishing permission is granted. Connect, disconnect, and authorize stay in this app. No Instagram post is created here.",
+                        "صلاحية نشر المحتوى ممنوحة. الربط والفصل والتفويض تبقى في هذا التطبيق. لا يُنشأ منشور إنستغرام من هنا.",
+                        language: model.language
+                    )
+                    : Copy.text(
+                        "Content publishing permission is missing. Tap Connect Instagram in this app.",
+                        "صلاحية نشر المحتوى غير موجودة. اضغط ربط إنستغرام في هذا التطبيق.",
+                        language: model.language
+                    )
+            )
+            .font(AppFont.caption)
+            .foregroundStyle(AppColor.mutedForeground)
+            if let id = ig?.igUserId, !id.isEmpty {
+                Text(Copy.text("Account id", "معرّف الحساب", language: model.language) + " · " + id)
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.mutedForeground)
+            }
+            if let error = ig?.lastError, !error.isEmpty {
+                Text(error)
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.destructive)
+            }
+        }
+        .padding(AppSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
+    }
+
+    private var linkingButtons: some View {
+        VStack(spacing: AppSpacing.sm) {
+            AppButton(
+                Copy.text("Connect Instagram", "ربط إنستغرام", language: model.language),
+                isEnabled: !model.busy
+            ) {
+                Task {
+                    await model.connectInstagram()
+                    AppHaptic.notify(success: model.errorMessage == nil)
+                }
+            }
+            AppButton(
+                Copy.text("Refresh account", "تحديث الحساب", language: model.language),
+                role: .outline,
+                isEnabled: !model.busy
+            ) {
+                Task { await model.refreshInstagram() }
+            }
+            AppButton(
+                Copy.text("Disconnect Instagram", "فصل إنستغرام", language: model.language),
+                role: .destructive,
+                isEnabled: !model.busy && model.agencyInstagram?.status == "connected"
+            ) {
+                Task { await model.disconnectInstagram() }
+            }
+        }
+    }
+
+    private func queueCard(_ item: QueueItem) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            HStack {
+                Text(item.productName?.isEmpty == false ? item.productName! : item.businessName)
+                    .font(AppFont.section)
+                    .foregroundStyle(AppColor.foreground)
+                Spacer()
+                AppBadge(title: queueStatus(item.status), tone: item.adminAuthorized ? .accent : .neutral)
+            }
+            Text("\(item.businessName) · \(item.customerName)")
+                .font(AppFont.caption)
+                .foregroundStyle(AppColor.mutedForeground)
+            Text(Copy.text("Instagram destination", "وجهة إنستغرام", language: model.language) + " · " + destinationHandle)
+                .font(AppFont.caption)
+                .foregroundStyle(AppColor.mutedForeground)
+            if item.kind == "image" {
+                CreativeImage(id: item.creativeId)
+            }
+            Text(Copy.text("Caption", "التعليق", language: model.language))
+                .font(AppFont.caption)
+                .foregroundStyle(AppColor.mutedForeground)
+            Text(item.caption.isEmpty ? "—" : item.caption)
+                .font(AppFont.secondary)
+                .foregroundStyle(AppColor.foreground)
+            HStack {
+                Text(
+                    Copy.text("Customer approval", "موافقة العميل", language: model.language)
+                        + ": "
+                        + (item.customerApprovedAt == nil
+                            ? Copy.text("No", "لا", language: model.language)
+                            : Copy.text("Yes", "نعم", language: model.language))
+                )
+                Spacer()
+                Text(
+                    Copy.text("Agency authorization", "تفويض الوكالة", language: model.language)
+                        + ": "
+                        + (item.adminAuthorized
+                            ? Copy.text("Yes", "نعم", language: model.language)
+                            : Copy.text("No", "لا", language: model.language))
+                )
+            }
+            .font(AppFont.caption)
+            .foregroundStyle(AppColor.mutedForeground)
+            if !item.lastError.isEmpty {
+                Text(item.lastError)
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.destructive)
+            }
+            if item.customerApprovedAt != nil, item.status != "published" {
+                AppButton(
+                    Copy.text("Authorize publication", "تفويض النشر", language: model.language),
+                    isEnabled: !model.busy
+                ) {
+                    Task {
+                        await model.authorizeQueueItem(item.id, caption: item.caption)
+                        AppHaptic.notify(success: model.errorMessage == nil)
+                    }
+                }
+            }
+            Text(Copy.text(
+                "Publish is not on this screen. Wait for an explicit confirmation before any Instagram post.",
+                "النشر ليس على هذه الشاشة. انتظر تأكيداً صريحاً قبل أي منشور على إنستغرام.",
+                language: model.language
+            ))
+            .font(AppFont.caption)
+            .foregroundStyle(AppColor.mutedForeground)
+        }
+        .padding(AppSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
+    }
+
+    private func queueStatus(_ status: String) -> String {
+        switch status {
+        case "pending_admin": return Copy.text("In queue", "في القائمة", language: model.language)
+        case "authorized": return Copy.text("Authorized", "مفوّض", language: model.language)
+        case "published": return Copy.text("Published", "منشور", language: model.language)
+        default: return status
+        }
     }
 }
