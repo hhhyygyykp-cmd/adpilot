@@ -1,17 +1,18 @@
-export const HOSTED_ORIGIN = "https://adpilot.apps.grok.bot";
+const FACEBOOK_OAUTH_DIALOG = "https://www.facebook.com/v22.0/dialog/oauth";
+const HOSTED_ORIGIN = "https://adpilot.apps.grok.bot";
 
-export const INSTAGRAM_LOGIN_HOST = "https://www.instagram.com";
-export const INSTAGRAM_TOKEN_HOST = "https://api.instagram.com";
-export const INSTAGRAM_GRAPH_HOST = "https://graph.instagram.com";
-export const INSTAGRAM_GRAPH_VERSION = "v22.0";
 export const CUSTOMER_CALLBACK_PATH = "/api/instagram/customer/callback";
 export const HOSTED_CUSTOMER_CALLBACK = `${HOSTED_ORIGIN}${CUSTOMER_CALLBACK_PATH}`;
 export const APP_CUSTOMER_HOST = "instagram-customer";
+export const META_CUSTOMER_CONFIGURATION_ID_NAME = "META_CUSTOMER_CONFIGURATION_ID";
 
-export const CUSTOMER_INSTAGRAM_PERMISSIONS = [
-  "instagram_business_basic",
-  "instagram_business_manage_insights",
+/** Unified Login permissions for customer analysis. Never include publishing. */
+export const CUSTOMER_UNIFIED_PERMISSIONS = [
+  "instagram_basic",
+  "instagram_manage_insights",
 ] as const;
+
+export const CUSTOMER_INSTAGRAM_PERMISSIONS = CUSTOMER_UNIFIED_PERMISSIONS;
 
 export const CUSTOMER_FORBIDDEN_PERMISSIONS = [
   "instagram_content_publish",
@@ -26,14 +27,16 @@ export function customerInstagramRedirectUri(): string {
 
 export function buildCustomerAuthorizationUrl(input: {
   clientId: string;
+  configId: string;
   redirectUri: string;
   state: string;
 }): string {
-  const url = new URL(`${INSTAGRAM_LOGIN_HOST}/oauth/authorize`);
+  const url = new URL(FACEBOOK_OAUTH_DIALOG);
   url.searchParams.set("client_id", input.clientId);
+  url.searchParams.set("config_id", input.configId);
   url.searchParams.set("redirect_uri", input.redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", CUSTOMER_INSTAGRAM_PERMISSIONS.join(","));
+  url.searchParams.set("override_default_response_type", "true");
   url.searchParams.set("state", input.state);
   return url.toString();
 }
@@ -57,12 +60,4 @@ export function customerInstagramAppReturnUrl(input: {
 export function customerPermissionsSafe(permissions: string[]): boolean {
   const granted = permissions.map((item) => item.toLowerCase());
   return !CUSTOMER_FORBIDDEN_PERMISSIONS.some((denied) => granted.includes(denied));
-}
-
-export function instagramGraphUrl(path: string): string {
-  const trimmed = path.startsWith("/") ? path : `/${path}`;
-  if (trimmed.startsWith("/oauth") || trimmed === "/access_token" || trimmed === "/refresh_access_token") {
-    return `${INSTAGRAM_GRAPH_HOST}${trimmed}`;
-  }
-  return `${INSTAGRAM_GRAPH_HOST}/${INSTAGRAM_GRAPH_VERSION}${trimmed}`;
 }

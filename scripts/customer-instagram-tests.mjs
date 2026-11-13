@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  CUSTOMER_FORBIDDEN_PERMISSIONS,
   CUSTOMER_INSTAGRAM_PERMISSIONS,
   HOSTED_CUSTOMER_CALLBACK,
   buildCustomerAuthorizationUrl,
@@ -43,24 +42,27 @@ async function register(email, password, name) {
   throw new Error(`auth ${email} failed`);
 }
 
-test("customer Instagram Login never requests publishing permissions", () => {
+test("customer Unified Login never requests publishing permissions", () => {
   assert.deepEqual([...CUSTOMER_INSTAGRAM_PERMISSIONS], [
-    "instagram_business_basic",
-    "instagram_business_manage_insights",
+    "instagram_basic",
+    "instagram_manage_insights",
   ]);
   const url = new URL(
     buildCustomerAuthorizationUrl({
       clientId: "app",
+      configId: "customer-config",
       redirectUri: HOSTED_CUSTOMER_CALLBACK,
       state: "state",
     }),
   );
-  assert.equal(url.hostname, "www.instagram.com");
-  assert.equal(url.searchParams.get("scope")?.includes("publish"), false);
-  for (const denied of CUSTOMER_FORBIDDEN_PERMISSIONS) {
-    assert.equal(url.searchParams.get("scope")?.includes(denied), false);
-  }
-  assert.equal(customerPermissionsSafe(["instagram_business_basic"]), true);
+  assert.equal(url.hostname, "www.facebook.com");
+  assert.equal(url.pathname, "/v22.0/dialog/oauth");
+  assert.equal(url.searchParams.get("config_id"), "customer-config");
+  assert.equal(url.searchParams.get("scope"), null);
+  assert.equal(url.searchParams.get("redirect_uri"), HOSTED_CUSTOMER_CALLBACK);
+  assert.equal(url.toString().includes("publish"), false);
+  assert.equal(customerPermissionsSafe(["instagram_basic", "instagram_manage_insights"]), true);
+  assert.equal(customerPermissionsSafe(["instagram_content_publish"]), false);
   assert.equal(customerPermissionsSafe(["instagram_business_content_publish"]), false);
   assert.equal(HOSTED_CUSTOMER_CALLBACK.includes("/api/admin/instagram"), false);
   const app = new URL(customerInstagramAppReturnUrl({ status: "pending", businessId: "b", state: "s" }));
@@ -91,7 +93,7 @@ test("customer Instagram routes stay owned and cannot publish", async () => {
   });
   assert.equal(mine.status, 200);
   assert.equal(mine.data.instagram.canPublish, false);
-  assert.equal(mine.data.instagram.login, "instagram");
+  assert.equal(mine.data.instagram.login, "unified");
   assert.deepEqual(jsonContainsTokenLeak(mine.data), []);
   assert.equal(JSON.stringify(mine.data).includes("token_ciphertext"), false);
 

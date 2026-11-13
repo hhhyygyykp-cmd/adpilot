@@ -1,12 +1,14 @@
 import "server-only";
 
-import { InstagramApiError, publicInstagramError } from "./meta";
 import {
-  INSTAGRAM_GRAPH_HOST,
-  INSTAGRAM_TOKEN_HOST,
-  instagramGraphUrl,
-} from "./customer-oauth";
-import { metaAppId, metaAppSecret } from "./config";
+  FACEBOOK_GRAPH_HOST,
+  FACEBOOK_GRAPH_VERSION,
+  metaAppId,
+  metaAppSecret,
+} from "./config";
+import { InstagramApiError, instagramGet, publicInstagramError } from "./meta";
+import { CUSTOMER_UNIFIED_PERMISSIONS } from "./customer-oauth";
+import { igUserProfileFields, nonexistingFieldFromGraphError, withoutGraphField } from "./discovery";
 
 type GraphErrorBody = {
   error?: { message?: string; type?: string; code?: number; error_user_msg?: string };
@@ -31,101 +33,154 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
+function graphMessage(body: unknown, status: number): string {
+  const error = (body as GraphErrorBody)?.error;
+  return stripSecrets(
+    error?.error_user_msg?.trim() || error?.message?.trim() || `Instagram API request failed (${status}).`,
+  );
+}
+
+function asPermissionList(value: string[] | string | undefined): string[] {
+  if (Array.isArray(value)) return value.map((item) => item.trim()).filter(Boolean);
+  if (typeof value === "string") {
+    return value
+      .split(/[,\s]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 export async function customerInstagramGet<T>(
   path: string,
   token: string,
   query: Record<string, string | undefined> = {},
 ): Promise<T> {
-  const url = new URL(path.startsWith("http") ? path : instagramGraphUrl(path));
-  for (const [key, value] of Object.entries(query)) {
-    if (value) url.searchParams.set(key, value);
-  }
-  const response = await fetch(url, {
-    method: "GET",
-    headers: { authorization: `Bearer ${token}`, accept: "application/json" },
-    cache: "no-store",
-  });
-  const body = await readJson(response);
-  if (!response.ok) {
-    const error = (body as GraphErrorBody).error;
-    throw new InstagramApiError(
-      stripSecrets(error?.error_user_msg || error?.message || `Instagram request failed (${response.status}).`),
-      response.status,
-      error?.code,
-    );
-  }
-  return body as T;
+  return instagramGet<T>(path, token, query);
 }
 
 export async function exchangeCustomerAuthorizationCode(input: {
   code: string;
   redirectUri: string;
 }): Promise<{ accessToken: string; userId: string; permissions: string[]; expiresIn: number }> {
-  const body = new URLSearchParams({
-    client_id: metaAppId(),
-    client_secret: metaAppSecret(),
-    grant_type: "authorization_code",
-    redirect_uri: input.redirectUri,
-    code: input.code,
-  });
-  const response = await fetch(`${INSTAGRAM_TOKEN_HOST}/oauth/access_token`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
-    body,
+  const url = new URL(`${FACEBOOK_GRAPH_HOST}/${FACEBOOK_GRAPH_VERSION}/oauth/access_token`);
+  url.searchParams.set("client_id", metaAppId());
+  url.searchParams.set("client_secret", metaAppSecret());
+  url.searchParams.set("redirect_uri", input.redirectUri);
+  url.searchParams.set("code", input.code.replace(/#_$/, "").split("#")[0]);
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { accept: "application/json" },
     cache: "no-store",
   });
-  const json = (await readJson(response)) as {
+  const body = (await readJson(response)) as {
     access_token?: string;
-    user_id?: string | number;
-    permissions?: string[];
-    error_message?: string;
-    error_type?: string;
+    expires_in?: number;
+    error?: { message?: string };
   };
-  if (!response.ok || !json.access_token) {
+  if (!response.ok || !body.access_token) {
     throw new InstagramApiError(
-      stripSecrets(json.error_message || "Instagram did not return an access token."),
-      response.status || 502,
+      graphMessage(body, response.status) || "Meta did not exchange the authorization code.",
+      response.status,
     );
   }
-  let accessToken = json.access_token;
-  let expiresIn = 60 * 60;
+  let accessToken = body.access_token;
+  let expiresIn = Number(body.expires_in ?? 0);
   try {
-    const longLived = await customerInstagramGet<{ access_token?: string; expires_in?: number }>(
-      `${INSTAGRAM_GRAPH_HOST}/access_token`,
-      accessToken,
-      {
-        grant_type: "ig_exchange_token",
-        client_secret: metaAppSecret(),
-        access_token: accessToken,
-      },
-    );
-    if (longLived.access_token) {
-      accessToken = longLived.access_token;
-      expiresIn = longLived.expires_in ?? 60 * 60 * 24 * 60;
+    const longLived = await refreshCustomerToken(accessToken);
+    if (longLived?.accessToken) {
+      accessToken = longLived.accessToken;
+      if (longLived.expiresIn > 0) expiresIn = longLived.expiresIn;
     }
   } catch {
-    /* keep the short-lived token if the long-lived exchange is unavailable */
+    /* Unified Login system-user tokens may already be long-lived */
   }
-  return {
-    accessToken,
-    userId: String(json.user_id ?? ""),
-    permissions: Array.isArray(json.permissions) ? json.permissions.map(String) : [],
-    expiresIn,
-  };
+  let permissions: string[] = [];
+  try {
+    const debugUrl = new URL(`${FACEBOOK_GRAPH_HOST}/${FACEBOOK_GRAPH_VERSION}/debug_token`);
+    debugUrl.searchParams.set("input_token", accessToken);
+    debugUrl.searchParams.set("access_token", `${metaAppId()}|${metaAppSecret()}`);
+    const debugResponse = await fetch(debugUrl, {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+    const debugBody = (await readJson(debugResponse)) as {
+      data?: { scopes?: string[] };
+    };
+    permissions = asPermissionList(debugBody.data?.scopes);
+  } catch {
+    permissions = [...CUSTOMER_UNIFIED_PERMISSIONS];
+  }
+  return { accessToken, userId: "", permissions, expiresIn };
 }
 
-export async function refreshCustomerToken(token: string): Promise<{ accessToken: string; expiresIn: number } | null> {
-  try {
-    const body = await customerInstagramGet<{ access_token?: string; expires_in?: number }>(
-      `${INSTAGRAM_GRAPH_HOST}/refresh_access_token`,
-      token,
-      { grant_type: "ig_refresh_token", access_token: token },
-    );
-    if (!body.access_token) return null;
-    return { accessToken: body.access_token, expiresIn: body.expires_in ?? 60 * 60 * 24 * 60 };
-  } catch {
-    return null;
+export async function refreshCustomerToken(
+  token: string,
+): Promise<{ accessToken: string; expiresIn: number } | null> {
+  const url = new URL(`${FACEBOOK_GRAPH_HOST}/${FACEBOOK_GRAPH_VERSION}/oauth/access_token`);
+  url.searchParams.set("grant_type", "fb_exchange_token");
+  url.searchParams.set("client_id", metaAppId());
+  url.searchParams.set("client_secret", metaAppSecret());
+  url.searchParams.set("fb_exchange_token", token);
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { accept: "application/json" },
+    cache: "no-store",
+  });
+  const body = (await readJson(response)) as { access_token?: string; expires_in?: number };
+  if (!response.ok || !body.access_token) return null;
+  return { accessToken: body.access_token, expiresIn: Number(body.expires_in ?? 0) };
+}
+
+export async function fetchCustomerGraphProfile(
+  token: string,
+  igUserId: string,
+): Promise<{
+  userId: string;
+  username: string;
+  name: string;
+  biography: string;
+  website: string;
+  profilePictureUrl: string;
+  followersCount: number | null;
+  followsCount: number | null;
+  mediaCount: number | null;
+  accountType: string;
+}> {
+  let fields = igUserProfileFields(["biography", "website", "followers_count", "follows_count", "media_count", "profile_picture_url"]);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    try {
+      const live = await instagramGet<Record<string, unknown>>(`/${igUserId}`, token, { fields });
+      return {
+        userId: String(live.id || igUserId),
+        username: String(live.username || ""),
+        name: String(live.name || ""),
+        biography: String(live.biography || ""),
+        website: String(live.website || ""),
+        profilePictureUrl: String(live.profile_picture_url || ""),
+        followersCount: numberOrNull(live.followers_count),
+        followsCount: numberOrNull(live.follows_count),
+        mediaCount: numberOrNull(live.media_count),
+        accountType: "",
+      };
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const badField = nonexistingFieldFromGraphError(message);
+      if (!badField) break;
+      const next = withoutGraphField(fields, badField);
+      if (!next || next === fields) break;
+      fields = next;
+    }
   }
+  throw lastError instanceof Error ? lastError : new InstagramApiError("Instagram did not return a professional profile.");
+}
+
+function numberOrNull(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 export function customerGraphPublicError(error: unknown, fallback: string): string {
