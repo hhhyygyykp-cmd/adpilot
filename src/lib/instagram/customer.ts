@@ -1026,7 +1026,3 @@ export async function confirmCustomerAnalysis(input: {
   });
   return { analysis: await getLatestAnalysis(input.customerId, input.businessId), business: updated };
 }
-
-export function customerCannotPublish(): true {
-  return true;
-}
