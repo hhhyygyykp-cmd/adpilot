@@ -2,6 +2,7 @@ import { requireCustomer } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { errorJson, json } from "@/lib/http";
 import { getBusiness, insertAsset, listAssets } from "@/lib/queries/businesses";
+import { clientKey, rateLimit } from "@/lib/rate-limit";
 import { MAX_UPLOAD_BYTES, saveUpload, sniffImageMime } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   const { id } = await ctx.params;
   const business = await getBusiness(auth.customer.id, id);
   if (!business) return errorJson("Business not found", 404);
+  const hourly = await rateLimit(clientKey(request, `assets:${auth.customer.id}`), 20, 60 * 60 * 1000);
+  if (!hourly.ok) return errorJson("Too many uploads. Try again later.", 429);
   let form: FormData;
   try {
     form = await request.formData();

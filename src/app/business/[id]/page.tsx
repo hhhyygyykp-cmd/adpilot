@@ -1,8 +1,9 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { ChatThread } from "@/components/chat-thread";
+import { CustomerInstagramPanel } from "@/components/customer-instagram";
 import { FalStudio } from "@/components/fal-studio";
 import { Shell } from "@/components/shell";
 import { useSession } from "@/components/providers";
@@ -148,6 +149,10 @@ export default function BusinessDetailPage() {
           </div>
         </form>
       )}
+
+      <Suspense fallback={null}>
+        <CustomerInstagramPanel businessId={id} />
+      </Suspense>
 
       <section className="mt-10 grid gap-6 md:grid-cols-2">
         <div className="panel rounded-3xl p-6">

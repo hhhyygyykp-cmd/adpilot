@@ -1168,6 +1168,14 @@ struct BusinessChat: View {
     let businessId: String
     @State private var business: Business?
     @State private var draft = ""
+    @State private var overview = ""
+    @State private var products = ""
+    @State private var personality = ""
+    @State private var visual = ""
+    @State private var themes = ""
+    @State private var audience = ""
+    @State private var opportunities = ""
+    @State private var approaches = ""
 
     var body: some View {
         ScrollView {
@@ -1186,6 +1194,7 @@ struct BusinessChat: View {
                             }
                         }
                     }
+                    customerInstagramSection
                     ForEach(business.onboardingState.messages) { message in
                         ChatBubble(text: message.text, isUser: message.role == "customer")
                     }
@@ -1226,10 +1235,159 @@ struct BusinessChat: View {
         .task { await reload() }
     }
 
+    @ViewBuilder
+    private var customerInstagramSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text(Copy.text("Connect Your Instagram", "اربط إنستغرام", language: model.language))
+                .font(AppFont.section)
+                .foregroundStyle(AppColor.foreground)
+            Text(Copy.text(
+                "Connect your Instagram account so AdPilot can understand your business, analyze your content, and create advertisements tailored to your brand.",
+                "اربط حساب إنستغرام حتى يفهم أدبايلوت عملك ويحلل محتواك وينشئ إعلانات تناسب علامتك.",
+                language: model.language
+            ))
+            .font(AppFont.caption)
+            .foregroundStyle(AppColor.mutedForeground)
+            Text(Copy.text(
+                "AdPilot never posts from your Instagram. Only the agency account publishes ads.",
+                "أدبايلوت لا ينشر من إنستغرام الخاص بك. حساب الوكالة فقط ينشر الإعلانات.",
+                language: model.language
+            ))
+            .font(AppFont.caption)
+            .foregroundStyle(AppColor.mutedForeground)
+            if let note = model.customerInstagram?.appReviewNote, !note.isEmpty {
+                Text(note)
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.mutedForeground)
+            }
+            if let ig = model.customerInstagram, ig.status == "connected" {
+                Text(Copy.text("Connected as", "متصل باسم", language: model.language) + " @" + (ig.username ?? ""))
+                    .font(AppFont.secondary)
+                    .foregroundStyle(AppColor.primary)
+            } else {
+                Text(Copy.text("Not connected", "غير متصل", language: model.language))
+                    .font(AppFont.secondary)
+                    .foregroundStyle(AppColor.mutedForeground)
+            }
+            if let error = model.customerInstagram?.lastError, !error.isEmpty {
+                Text(error)
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.destructive)
+            }
+            AppButton(
+                Copy.text("Connect Instagram", "ربط إنستغرام", language: model.language),
+                isEnabled: !model.busy
+            ) {
+                Task {
+                    await model.connectCustomerInstagram(businessId)
+                    AppHaptic.notify(success: model.errorMessage == nil)
+                }
+            }
+            AppButton(
+                Copy.text("Analyze my business", "حلّل عملي", language: model.language),
+                role: .outline,
+                isEnabled: !model.busy && model.customerInstagram?.status == "connected"
+            ) {
+                Task {
+                    await model.analyzeCustomerInstagram(businessId)
+                    applyInferred()
+                    AppHaptic.notify(success: model.errorMessage == nil)
+                }
+            }
+            AppButton(
+                Copy.text("Disconnect Instagram", "فصل إنستغرام", language: model.language),
+                role: .destructive,
+                isEnabled: !model.busy && model.customerInstagram?.status == "connected"
+            ) {
+                Task { await model.disconnectCustomerInstagram(businessId) }
+            }
+            if let analysis = model.customerAnalysis, analysis.inferred != nil {
+                Text(Copy.text("Here's what AdPilot learned about your business.", "إليك ما تعلّمه أدبايلوت عن عملك.", language: model.language))
+                    .font(AppFont.section)
+                    .foregroundStyle(AppColor.foreground)
+                    .padding(.top, AppSpacing.sm)
+                if analysis.inferred?.preliminary == true {
+                    Text(Copy.text(
+                        "Few posts were available, so these recommendations are preliminary.",
+                        "عدد المنشورات قليل، لذا هذه التوصيات أولية.",
+                        language: model.language
+                    ))
+                    .font(AppFont.caption)
+                    .foregroundStyle(AppColor.mutedForeground)
+                }
+                Text(
+                    analysis.inferred?.visionUsed == true
+                        ? Copy.text("AdPilot looked at retrieved images when describing visual identity.", "اطّلع أدبايلوت على الصور المسترجعة عند وصف الهوية البصرية.", language: model.language)
+                        : Copy.text("Images were not visually analyzed. This is based on captions and profile text.", "لم تُحلَّل الصور بصرياً. هذا من التعليقات ونص الملف الشخصي.", language: model.language)
+                )
+                .font(AppFont.caption)
+                .foregroundStyle(AppColor.mutedForeground)
+                if let note = analysis.retrieved?.insights?.note, !note.isEmpty {
+                    Text(note)
+                        .font(AppFont.caption)
+                        .foregroundStyle(AppColor.mutedForeground)
+                }
+                insightField(Copy.text("Business overview", "نظرة عامة", language: model.language), text: $overview)
+                insightField(Copy.text("Products and services", "المنتجات والخدمات", language: model.language), text: $products)
+                insightField(Copy.text("Brand personality", "شخصية العلامة", language: model.language), text: $personality)
+                insightField(Copy.text("Visual identity", "الهوية البصرية", language: model.language), text: $visual)
+                insightField(Copy.text("Content themes", "موضوعات المحتوى", language: model.language), text: $themes)
+                insightField(Copy.text("Potential audience", "الجمهور المحتمل", language: model.language), text: $audience)
+                insightField(Copy.text("Marketing opportunities", "فرص تسويقية", language: model.language), text: $opportunities)
+                insightField(Copy.text("Recommended advertising approaches", "أساليب إعلانية موصى بها", language: model.language), text: $approaches)
+                AppButton(
+                    Copy.text("Edit and confirm", "عدّل وأكّد", language: model.language),
+                    isEnabled: !model.busy && analysis.id != nil
+                ) {
+                    Task {
+                        guard let id = analysis.id, var inferred = analysis.inferred else { return }
+                        inferred = InferredInsights(
+                            overview: overview,
+                            productsServices: products,
+                            brandPersonality: personality,
+                            visualIdentity: visual,
+                            contentThemes: themes,
+                            audience: audience,
+                            opportunities: opportunities,
+                            recommendedApproaches: approaches,
+                            confidence: inferred.confidence,
+                            preliminary: inferred.preliminary,
+                            visionUsed: inferred.visionUsed
+                        )
+                        await model.confirmCustomerInstagram(businessId, analysisId: id, inferred: inferred)
+                        AppHaptic.notify(success: model.errorMessage == nil)
+                    }
+                }
+            }
+        }
+        .padding(AppSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
+    }
+
+    private func insightField(_ label: String, text: Binding<String>) -> some View {
+        AppTextField(label: label, text: text)
+    }
+
     private func reload() async {
         business = model.businesses.first { $0.id == businessId }
         if business == nil { await model.refreshLists() }
         business = model.businesses.first { $0.id == businessId }
+        await model.loadCustomerInstagram(businessId)
+        applyInferred()
+    }
+
+    private func applyInferred() {
+        guard let inferred = model.customerAnalysis?.inferred else { return }
+        overview = inferred.overview
+        products = inferred.productsServices
+        personality = inferred.brandPersonality
+        visual = inferred.visualIdentity
+        themes = inferred.contentThemes
+        audience = inferred.audience
+        opportunities = inferred.opportunities
+        approaches = inferred.recommendedApproaches
     }
 
     private func send(text: String? = nil, skipRemaining: Bool = false) async {
