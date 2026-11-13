@@ -163,7 +163,8 @@ export type MemoryKind =
   | "preference"
   | "campaign_history"
   | "measured_insight"
-  | "hypothesis";
+  | "hypothesis"
+  | "instagram_observation";
 
 export type MemoryEntry = {
   id: string;
@@ -173,6 +174,9 @@ export type MemoryEntry = {
   label: string;
   value: string;
   evidence: string;
+  source?: string;
+  confidence?: string;
+  retrievedAt?: string | null;
   createdAt: string;
 };
 
@@ -220,7 +224,7 @@ export type MarketingPlan = {
   verifiedFacts: VerifiedFact[];
   preferences: Array<{ label: string; value: string }>;
   history: HistoryItem[];
-  measuredInsights: Array<{ label: string; value: string; available: false }>;
+  measuredInsights: Array<{ label: string; value: string; available: boolean }>;
   hypotheses: Array<{ claim: string; basis: string }>;
   audience: string;
   angle: string;

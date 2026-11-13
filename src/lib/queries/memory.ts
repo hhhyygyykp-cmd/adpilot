@@ -12,6 +12,9 @@ type Row = {
   label: string;
   value: string;
   evidence: string;
+  source?: string | null;
+  confidence?: string | null;
+  retrieved_at?: string | null;
   created_at: string;
 };
 
@@ -24,13 +27,17 @@ function mapRow(row: Row): MemoryEntry {
     label: row.label,
     value: row.value,
     evidence: row.evidence,
+    source: row.source ?? "",
+    confidence: row.confidence ?? "",
+    retrievedAt: row.retrieved_at ? new Date(row.retrieved_at).toISOString() : null,
     createdAt: new Date(row.created_at).toISOString(),
   };
 }
 
 export async function listMemory(customerId: string, businessId: string): Promise<MemoryEntry[]> {
   const rows = await sql<Row>(
-    `select id, business_id, source_campaign_id, kind, label, value, evidence, created_at
+    `select id, business_id, source_campaign_id, kind, label, value, evidence,
+            coalesce(source, '') as source, coalesce(confidence, '') as confidence, retrieved_at, created_at
      from business_memory
      where customer_id = $1 and business_id = $2
      order by created_at desc
@@ -48,11 +55,14 @@ export async function insertMemory(input: {
   label: string;
   value: string;
   evidence: string;
+  source?: string;
+  confidence?: string;
+  retrievedAt?: string | null;
 }) {
   await sql(
     `insert into business_memory (
-       id, customer_id, business_id, source_campaign_id, kind, label, value, evidence
-     ) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+       id, customer_id, business_id, source_campaign_id, kind, label, value, evidence, source, confidence, retrieved_at
+     ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
     [
       newId(),
       input.customerId,
@@ -62,7 +72,21 @@ export async function insertMemory(input: {
       input.label,
       input.value,
       input.evidence,
+      input.source ?? "",
+      input.confidence ?? "",
+      input.retrievedAt ?? null,
     ],
+  );
+}
+
+export async function deleteMemoryByKind(
+  customerId: string,
+  businessId: string,
+  kind: MemoryKind,
+) {
+  await sql(
+    `delete from business_memory where customer_id = $1 and business_id = $2 and kind = $3`,
+    [customerId, businessId, kind],
   );
 }
 

@@ -62,7 +62,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     return json({ publication: result });
   }
   if (action === "publish") {
-    const limited = rateLimit(clientKey(request, `ig-publish:${auth.customer.id}`), 20, 60 * 60 * 1000);
+    const limited = await rateLimit(clientKey(request, `ig-publish:${auth.customer.id}`), 20, 60 * 60 * 1000);
     if (!limited.ok) return errorJson("Too many publish attempts. Try again shortly.", 429);
     const result = await publishAuthorizedAd({
       request,

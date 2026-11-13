@@ -139,7 +139,8 @@ function AgencySettings() {
             <dl className="mt-6 grid gap-4 sm:grid-cols-2">
               <Field label={t("admin.username")} value={storedUsername || "—"} />
               <Field label={t("admin.accountId")} value={data.igUserId || "—"} />
-              <Field label={t("admin.accountType")} value={data.accountType || data.name || "—"} />
+              <Field label={t("admin.profileName")} value={data.name || "—"} />
+              <Field label={t("admin.accountType")} value={data.accountType || "—"} />
               <Field
                 label={t("admin.permissions")}
                 value={data.permissions.length ? data.permissions.join(", ") : "—"}

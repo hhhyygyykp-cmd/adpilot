@@ -4,20 +4,9 @@ An AI advertising agency app. Customers describe what they want to promote. AdPi
 
 Phase 1–2 in this tree: accounts, business profiles, conversational briefs. No Runway or paid media calls.
 
-## iPhone Simulator
+## iPhone app (Xcode)
 
-Open `ios/AdPilot.xcodeproj` in Xcode and press Run. A Debug run uses `http://127.0.0.1:3000` on this Mac. The iOS Simulator shares the Mac’s network, and the dev server listens on `127.0.0.1` only, so the app uses that address rather than `localhost`. Release builds still use `https://adpilot.apps.grok.bot` and do not make that site public.
-
-Start the server first, in the repo folder:
-
-```bash
-npm run dev
-npm run demo
-```
-
-Sign in with the account printed by `npm run demo`. Paid generation stays off.
-
-Agency Instagram publishing uses one professional account that only an administrator connects in `/admin/settings`. Customers never connect Instagram. A finished ad is posted only after customer approval and an explicit admin Publish action. Live Instagram post IDs and insights are stored only when Meta returns them.
+Open `ios/AdPilot.xcodeproj` in Xcode and press Run. The app talks to the live AdPilot server. Sign in as an administrator to use the Queue tab for Instagram linking and authorization. Customers never connect Instagram. Nothing is posted until Publish is confirmed.
 
 Agency Instagram uses Meta Unified Login (Facebook Login for Business with a configuration id). The OAuth callback is exactly `https://adpilot.apps.grok.bot/api/admin/instagram/callback`. Start Connect while signed in on the hosted app.
 
@@ -43,6 +32,7 @@ Optional:
 
 - `ADMIN_EMAILS` — comma-separated administrator emails (never auto-promotes the first user)
 - `OPENAI_API_KEY` — optional LLM interpretation; without it a structured conversation engine is used
+- `FAL_GLOBAL_BUDGET_USD` — optional ceiling for all fal spend on this server (defaults to the per-account testing budget so extra signups cannot multiply cost)
 
 ## Scripts
 

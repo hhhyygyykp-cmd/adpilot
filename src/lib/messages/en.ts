@@ -15,7 +15,7 @@ export const en = {
   },
   landing: {
     headline: "What would you like to advertise today?",
-    body: "AdPilot is an advertising agency operated through AI. You explain the business. We remember it, interpret the brief, and — when generation is enabled — produce the ads.",
+    body: "AdPilot is an advertising agency operated through AI. You explain the business. We remember it, interpret the brief, and — when generation is enabled — produce the ads. If OpenAI is enabled, brief text may be sent to OpenAI to extract campaign fields.",
     cta: "Create your account",
     secondary: "I already have an account",
   },
@@ -34,6 +34,8 @@ export const en = {
     english: "English",
     arabic: "العربية",
     inviteNote: "This registration uses an administrator invitation.",
+    openaiNotice:
+      "If OpenAI is enabled, AdPilot may send brief text you type to OpenAI to extract campaign fields. This is optional; AdPilot works without it.",
   },
   home: {
     headline: "What would you like to advertise today?",
@@ -57,9 +59,11 @@ export const en = {
     generationOff:
       "Confirm the brief and a concept, then review the fal.ai estimate. Paid stills and video run only after you authorize. If FAL_KEY is missing, AdPilot stores a local preview and does not send the brief to an outside image service.",
     interpreterStructured: "Interpreted from your words (structured conversation engine).",
-    interpreterLlm: "Interpreted with the configured language model, then checked against your words.",
+    interpreterLlm: "Interpreted with OpenAI, then checked against your words.",
     needBusiness: "Choose or create a business before writing an ad.",
     refreshSafe: "You can refresh this page. Your answers are already saved.",
+    openaiNotice:
+      "If OpenAI is enabled, AdPilot may send this brief to OpenAI to extract campaign fields. This is optional; AdPilot works without it.",
   },
   ads: {
     title: "My Ads",
@@ -130,6 +134,36 @@ export const en = {
       brandColors: "Brand colors",
       preferredLanguage: "Preferred ad language",
     },
+    instagram: {
+      title: "Connect Your Instagram",
+      description:
+        "Connect your Instagram account so AdPilot can understand your business, analyze your content, and create advertisements tailored to your brand.",
+      connect: "Connect Instagram",
+      analyze: "Analyze my business",
+      insights: "What AdPilot learned",
+      review: "Review findings",
+      confirm: "Edit and confirm",
+      disconnect: "Disconnect Instagram",
+      deleteImported: "Delete imported Instagram data",
+      neverPublish: "AdPilot never posts from your Instagram. Only the agency account publishes ads.",
+      learned: "Here's what AdPilot learned about your business.",
+      retrieved: "Retrieved from Instagram",
+      inferred: "Inferred by AdPilot — review before saving",
+      overview: "Business overview",
+      products: "Products and services",
+      personality: "Brand personality",
+      visual: "Visual identity",
+      themes: "Content themes",
+      audience: "Potential audience",
+      opportunities: "Marketing opportunities",
+      approaches: "Recommended advertising approaches",
+      preliminary: "Few posts were available, so these recommendations are preliminary.",
+      captionsOnly: "Images were not visually analyzed. This is based on captions and profile text.",
+      visionUsed: "AdPilot looked at retrieved images when describing visual identity.",
+      ineligible: "This Instagram account could not be used. Professional accounts are required. You can still complete your business profile by hand.",
+      connectedAs: "Connected as",
+      notConnected: "Not connected",
+    },
   },
   account: {
     title: "Account",
@@ -142,6 +176,8 @@ export const en = {
     newPassword: "New password",
     changePassword: "Update password",
     signOut: "Sign out of AdPilot",
+    openaiNotice:
+      "If OpenAI is enabled, brief text you type may be sent to OpenAI to extract campaign fields. This is optional; AdPilot works without it.",
   },
   admin: {
     title: "Agency workspace",
@@ -183,6 +219,7 @@ export const en = {
     needsReauth: "Needs reconnect",
     username: "Username",
     accountId: "Instagram account id",
+    profileName: "Profile name",
     accountType: "Account type",
     permissions: "Granted permissions",
     connectedAt: "Connected",
@@ -215,6 +252,7 @@ export const en = {
     publishStatus: "Publishing status",
     requested: "Requested date",
     preview: "Ad preview",
+    destination: "Instagram destination",
     livePost: "Live Instagram post",
     noLivePost: "No Instagram post id is stored. A successful publish is never faked.",
     insightsRefresh: "Refresh insights",

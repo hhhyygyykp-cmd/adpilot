@@ -133,13 +133,7 @@ export async function runMarketingAgent(input: {
     verifiedFacts,
     preferences,
     history: scopedHistory,
-    measuredInsights: [
-      {
-        label: "Campaign performance",
-        value: "None on file. Approval of a brief is not a result.",
-        available: false,
-      },
-    ],
+    measuredInsights: measuredFrom(memory),
     hypotheses,
     audience: strategy.data.audience,
     angle: strategy.data.angle,
@@ -222,6 +216,24 @@ function inventsMetrics(text: string): boolean {
   return /\d+\s*%|\bROI\b|impressions|went viral|best[- ]selling/i.test(text);
 }
 
+function measuredFrom(memory: MemoryEntry[]): MarketingPlan["measuredInsights"] {
+  const insights = memory.filter((item) => item.kind === "measured_insight" || item.kind === "instagram_observation");
+  if (insights.length === 0) {
+    return [
+      {
+        label: "Campaign performance",
+        value: "None on file. Approval of a brief is not a result. Instagram likes are not sales.",
+        available: false,
+      },
+    ];
+  }
+  return insights.slice(0, 6).map((item) => ({
+    label: item.label,
+    value: item.value,
+    available: item.kind === "measured_insight",
+  }));
+}
+
 function verifiedFrom(business: Business, facts: CampaignFacts, prompt: string): MarketingPlan["verifiedFacts"] {
   const rows: MarketingPlan["verifiedFacts"] = [];
   if (business.name) rows.push({ fact: `Business: ${business.name}`, source: "Business profile" });
@@ -229,6 +241,9 @@ function verifiedFrom(business: Business, facts: CampaignFacts, prompt: string):
   if (facts.offer) rows.push({ fact: `Offer: ${facts.offer}`, source: "Customer brief" });
   if (facts.objective) rows.push({ fact: `Objective: ${facts.objective}`, source: "Customer brief" });
   if (business.location) rows.push({ fact: `Location: ${business.location}`, source: "Business profile" });
+  if (business.productsServices) {
+    rows.push({ fact: `Products: ${business.productsServices}`, source: "Business profile" });
+  }
   if (facts.audienceNote) {
     rows.push({ fact: `Audience: ${facts.audienceNote}`, source: "Customer brief" });
   }
@@ -266,9 +281,12 @@ function evidenceLines(
     `Profile ${business.name || "(unnamed)"} loaded`,
     historyNote || `${history.length} prior campaign record(s) in the same product context`,
     `${memory.filter((item) => item.kind === "verified_fact").length} stored verified fact(s)`,
+    `${memory.filter((item) => item.kind === "instagram_observation").length} customer-approved Instagram observation(s)`,
     `${memory.filter((item) => item.kind === "measured_insight").length} measured insight(s) — none invented`,
   ];
   if (facts.offer) lines.push(`Offer taken from the customer, not estimated`);
+  const ig = memory.find((item) => item.kind === "instagram_observation");
+  if (ig) lines.push("New ads must be original. Do not copy old Instagram captions.");
   return lines;
 }
 
@@ -289,8 +307,15 @@ export function planSummary(language: "en" | "ar", plan: MarketingPlan, business
         ? ` أعدت استخدام: ${plan.reusedFromHistory.join("، ")}.`
         : ` Reused from history: ${plan.reusedFromHistory.join(", ")}.`
       : "";
+  const performance = plan.measuredInsights.some((item) => item.available)
+    ? language === "ar"
+      ? " توجد نتائج حملات محفوظة."
+      : " Measured campaign results are on file."
+    : language === "ar"
+      ? " لا توجد نتائج أداء محفوظة. الإعجابات ليست مبيعات."
+      : " No performance results are on file. Likes are not sales.";
   if (language === "ar") {
-    return `اخترت «${framework}» لأن ${plan.framework?.reason ?? "هذا ما تدعمه الحقائق"}.${history}${reused} لا توجد نتائج أداء محفوظة.`;
+    return `اخترت «${framework}» لأن ${plan.framework?.reason ?? "هذا ما تدعمه الحقائق"}.${history}${reused}${performance}`;
   }
-  return `I chose ${framework} because ${plan.framework?.reason ?? "that is what the facts support."}${history}${reused} No performance results are on file.`;
+  return `I chose ${framework} because ${plan.framework?.reason ?? "that is what the facts support."}${history}${reused}${performance}`;
 }

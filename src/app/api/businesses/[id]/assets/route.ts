@@ -2,6 +2,7 @@ import { requireCustomer } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { errorJson, json } from "@/lib/http";
 import { getBusiness, insertAsset, listAssets } from "@/lib/queries/businesses";
+import { clientKey, rateLimit } from "@/lib/rate-limit";
 import { MAX_UPLOAD_BYTES, saveUpload, sniffImageMime } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,14 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   const { id } = await ctx.params;
   const business = await getBusiness(auth.customer.id, id);
   if (!business) return errorJson("Business not found", 404);
-  const form = await request.formData();
+  const hourly = await rateLimit(clientKey(request, `assets:${auth.customer.id}`), 20, 60 * 60 * 1000);
+  if (!hourly.ok) return errorJson("Too many uploads. Try again later.", 429);
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return errorJson("Could not read the upload");
+  }
   const kindRaw = String(form.get("kind") ?? "");
   const kind = kindRaw === "logo" ? "logo" : kindRaw === "product_photo" ? "product_photo" : null;
   if (!kind) return errorJson("Choose logo or product photo");
@@ -31,11 +39,16 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   const buffer = Buffer.from(await file.arrayBuffer());
   const sniffed = sniffImageMime(buffer);
   if (!sniffed) return errorJson("Upload a JPEG, PNG, WEBP, or GIF image");
-  const saved = await saveUpload({
-    customerId: auth.customer.id,
-    buffer,
-    mimeType: sniffed,
-  });
+  let saved: { storageKey: string; mimeType: string };
+  try {
+    saved = await saveUpload({
+      customerId: auth.customer.id,
+      buffer,
+      mimeType: sniffed,
+    });
+  } catch {
+    return errorJson("Could not store the file", 500);
+  }
   const assetId = await insertAsset({
     customerId: auth.customer.id,
     businessId: id,

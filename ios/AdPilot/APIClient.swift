@@ -11,15 +11,8 @@ enum APIError: LocalizedError {
 }
 
 enum APIEnvironment {
-    /// Xcode Run uses Debug and talks to the Next.js server on this Mac.
-    /// Archive and Release keep the hosted address and do not make it public.
-    static let baseURL: URL = {
-        #if DEBUG
-        return URL(string: "http://127.0.0.1:3000")!
-        #else
-        return URL(string: "https://adpilot.apps.grok.bot")!
-        #endif
-    }()
+    /// Xcode Run talks to the live AdPilot server so Instagram linking and the agency queue match the connected account.
+    static let baseURL = URL(string: "https://adpilot.apps.grok.bot")!
 }
 
 struct APIClient {
@@ -66,7 +59,7 @@ struct APIClient {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
             throw APIError.message(
-                "Cannot reach AdPilot at \(baseURL.absoluteString). On this Mac, run npm run dev and leave it running."
+                "Cannot reach AdPilot at \(baseURL.absoluteString)."
             )
         }
         let http = response as? HTTPURLResponse
@@ -74,12 +67,12 @@ struct APIClient {
         let type = http?.value(forHTTPHeaderField: "Content-Type") ?? ""
         if looksLikeGate(data) {
             throw APIError.message(
-                "This request reached the private hosted app. Run from Xcode using the Debug configuration so it uses http://127.0.0.1:3000."
+                "This request did not reach AdPilot. Open ios/AdPilot.xcodeproj in Xcode and press Run."
             )
         }
         if type.contains("text/html") {
             throw APIError.message(
-                "AdPilot at \(baseURL.absoluteString) did not return app data. Start the local server with npm run dev."
+                "AdPilot at \(baseURL.absoluteString) did not return app data."
             )
         }
         if status == 401 {

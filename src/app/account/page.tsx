@@ -95,6 +95,7 @@ export default function AccountPage() {
           {t("account.changePassword")}
         </button>
       </form>
+      <p className="mt-6 max-w-lg text-xs text-[var(--muted)]">{t("account.openaiNotice")}</p>
     </Shell>
   );
 }

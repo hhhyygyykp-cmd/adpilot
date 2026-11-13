@@ -85,6 +85,7 @@ function RegisterForm() {
           />
           <span className="mt-1 block text-xs text-[var(--muted)]">{t("auth.passwordHint")}</span>
         </label>
+        <p className="text-xs text-[var(--muted)]">{t("auth.openaiNotice")}</p>
         <fieldset className="text-sm">
           <legend>{t("auth.language")}</legend>
           <div className="mt-2 flex gap-3">

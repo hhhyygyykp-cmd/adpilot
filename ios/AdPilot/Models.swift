@@ -215,6 +215,229 @@ struct Campaign: Decodable, Identifiable {
     }
 }
 
+struct QueueItem: Decodable, Identifiable {
+    let id: String
+    var creativeId: String
+    var kind: String
+    var caption: String
+    var customerApprovedAt: String?
+    var adminAuthorized: Bool
+    var status: String
+    var lastError: String
+    var customerEmail: String
+    var customerName: String
+    var businessName: String
+    var productName: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        creativeId = c.str(.creativeId)
+        kind = c.str(.kind)
+        caption = c.str(.caption)
+        customerApprovedAt = try? c.decode(String.self, forKey: .customerApprovedAt)
+        adminAuthorized = (try? c.decode(Bool.self, forKey: .adminAuthorized)) ?? false
+        status = c.str(.status)
+        lastError = c.str(.lastError)
+        customerEmail = c.str(.customerEmail)
+        customerName = c.str(.customerName)
+        businessName = c.str(.businessName)
+        productName = try? c.decode(String.self, forKey: .productName)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, creativeId, kind, caption, customerApprovedAt, adminAuthorized, status, lastError
+        case customerEmail, customerName, businessName, productName
+    }
+}
+
+struct QueueDestination: Decodable {
+    var username: String?
+    var igUserId: String?
+    var targetUsername: String?
+}
+
+struct QueuePayload: Decodable {
+    var publications: [QueueItem]
+    var destination: QueueDestination?
+}
+
+struct AgencyInstagram: Decodable {
+    var status: String
+    var username: String?
+    var igUserId: String?
+    var permissions: [String]
+    var lastError: String
+    var targetUsername: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        status = c.str(.status)
+        username = try? c.decode(String.self, forKey: .username)
+        igUserId = try? c.decode(String.self, forKey: .igUserId)
+        permissions = (try? c.decode([String].self, forKey: .permissions)) ?? []
+        lastError = c.str(.lastError)
+        targetUsername = try? c.decode(String.self, forKey: .targetUsername)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case status, username, igUserId, permissions, lastError, targetUsername
+    }
+
+    var handle: String {
+        let raw = (username ?? targetUsername ?? "adpilot.ae").trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.isEmpty { return "@adpilot.ae" }
+        return raw.hasPrefix("@") ? raw : "@\(raw)"
+    }
+
+    var canPublish: Bool {
+        status == "connected" && permissions.contains("instagram_content_publish")
+    }
+}
+
+struct AgencyInstagramPayload: Decodable { var instagram: AgencyInstagram }
+struct PublicationActionPayload: Decodable { var publication: Publication }
+struct ConnectPayload: Decodable { var url: String }
+
+struct CustomerInstagram: Decodable {
+    var status: String
+    var username: String?
+    var name: String?
+    var biography: String?
+    var lastError: String
+    var accessNote: String
+    var appReviewNote: String
+    var canPublish: Bool
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        status = c.str(.status)
+        username = try? c.decode(String.self, forKey: .username)
+        name = try? c.decode(String.self, forKey: .name)
+        biography = try? c.decode(String.self, forKey: .biography)
+        lastError = c.str(.lastError)
+        accessNote = c.str(.accessNote)
+        appReviewNote = c.str(.appReviewNote)
+        canPublish = (try? c.decode(Bool.self, forKey: .canPublish)) ?? false
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case status, username, name, biography, lastError, accessNote, appReviewNote, canPublish
+    }
+}
+
+struct InstagramInsightsNote: Decodable {
+    var available: Bool?
+    var note: String?
+}
+
+struct InstagramRetrieved: Decodable {
+    var insights: InstagramInsightsNote?
+}
+
+struct InferredInsights: Decodable {
+    var overview: String
+    var productsServices: String
+    var brandPersonality: String
+    var visualIdentity: String
+    var contentThemes: String
+    var audience: String
+    var opportunities: String
+    var recommendedApproaches: String
+    var confidence: String
+    var preliminary: Bool
+    var visionUsed: Bool
+
+    init(
+        overview: String,
+        productsServices: String,
+        brandPersonality: String,
+        visualIdentity: String,
+        contentThemes: String,
+        audience: String,
+        opportunities: String,
+        recommendedApproaches: String,
+        confidence: String,
+        preliminary: Bool,
+        visionUsed: Bool
+    ) {
+        self.overview = overview
+        self.productsServices = productsServices
+        self.brandPersonality = brandPersonality
+        self.visualIdentity = visualIdentity
+        self.contentThemes = contentThemes
+        self.audience = audience
+        self.opportunities = opportunities
+        self.recommendedApproaches = recommendedApproaches
+        self.confidence = confidence
+        self.preliminary = preliminary
+        self.visionUsed = visionUsed
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        overview = c.str(.overview)
+        productsServices = c.str(.productsServices)
+        brandPersonality = c.str(.brandPersonality)
+        visualIdentity = c.str(.visualIdentity)
+        contentThemes = c.str(.contentThemes)
+        audience = c.str(.audience)
+        opportunities = c.str(.opportunities)
+        recommendedApproaches = c.str(.recommendedApproaches)
+        confidence = c.str(.confidence)
+        preliminary = (try? c.decode(Bool.self, forKey: .preliminary)) ?? false
+        visionUsed = (try? c.decode(Bool.self, forKey: .visionUsed)) ?? false
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case overview, productsServices, brandPersonality, visualIdentity, contentThemes
+        case audience, opportunities, recommendedApproaches, confidence, preliminary, visionUsed
+    }
+
+    func asBody() -> [String: Any] {
+        [
+            "overview": overview,
+            "productsServices": productsServices,
+            "brandPersonality": brandPersonality,
+            "visualIdentity": visualIdentity,
+            "contentThemes": contentThemes,
+            "audience": audience,
+            "opportunities": opportunities,
+            "recommendedApproaches": recommendedApproaches,
+        ]
+    }
+}
+
+struct CustomerAnalysis: Decodable {
+    var id: String?
+    var status: String
+    var inferred: InferredInsights?
+    var retrieved: InstagramRetrieved?
+    var visionUsed: Bool
+    var mediaCount: Int
+    var lastError: String
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try? c.decode(String.self, forKey: .id)
+        status = c.str(.status)
+        inferred = try? c.decode(InferredInsights.self, forKey: .inferred)
+        retrieved = try? c.decode(InstagramRetrieved.self, forKey: .retrieved)
+        visionUsed = (try? c.decode(Bool.self, forKey: .visionUsed)) ?? false
+        mediaCount = (try? c.decode(Int.self, forKey: .mediaCount)) ?? 0
+        lastError = c.str(.lastError)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, status, inferred, retrieved, visionUsed, mediaCount, lastError
+    }
+}
+
+struct CustomerInstagramPayload: Decodable {
+    var instagram: CustomerInstagram
+    var analysis: CustomerAnalysis?
+}
+
 struct BusinessListPayload: Decodable { var businesses: [Business] }
 struct BusinessPayload: Decodable { var business: Business }
 struct CampaignListPayload: Decodable { var campaigns: [Campaign] }

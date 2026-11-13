@@ -28,12 +28,12 @@ export async function composeVideoAd(input: Omit<AdLayout, "photo"> & { footage:
       ? `;[1:v]scale=140:-1[lg];[move][lg]overlay=48:48[placed]`
       : "";
     const placed = input.logo ? "placed" : "move";
-    const headline = escapeDrawtext(input.headline);
-    const support = escapeDrawtext(input.supportingCopy);
-    const offer = input.offer ? escapeDrawtext(input.offer) : "";
-    const cta = escapeDrawtext(input.cta);
-    const name = escapeDrawtext(input.businessName);
-    const font = escapeDrawtext(FONT);
+    const headline = sanitizeDrawtext(input.headline);
+    const support = sanitizeDrawtext(input.supportingCopy);
+    const offer = input.offer ? sanitizeDrawtext(input.offer) : "";
+    const cta = sanitizeDrawtext(input.cta);
+    const name = sanitizeDrawtext(input.businessName);
+    const font = escapeFontPath(FONT);
     const filter = [
       middle,
       logoChain,
@@ -79,8 +79,20 @@ function draw(font: string, text: string, size: number, x: string, y: string, co
   return `drawtext=fontfile='${font}':text='${text}':fontsize=${size}:fontcolor=${color}:x=${x}:y=${y}`;
 }
 
-function escapeDrawtext(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'").replace(/%/g, "\\%");
+function escapeFontPath(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'");
+}
+
+const DRAWTEXT_SAFE = /[^\p{L}\p{N}\s.!?\-&/+#@%]/gu;
+
+export function sanitizeDrawtext(value: string): string {
+  const cleaned = value
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(DRAWTEXT_SAFE, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+  return cleaned.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'").replace(/%/g, "\\%");
 }
 
 function isMp4(buffer: Buffer): boolean {
