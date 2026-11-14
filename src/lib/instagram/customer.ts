@@ -321,15 +321,13 @@ export async function completeCustomerInstagramOAuth(input: {
       code,
       redirectUri: customerInstagramRedirectUri(),
     });
-    if (!customerPermissionsSafe(exchanged.permissions)) {
-      return { error: "This connection asked for posting access. AdPilot refused it. Connect again for reading only.", status: 403 };
-    }
+    const readPermissions = exchanged.permissions.filter((item) => customerPermissionsSafe([item]));
     const saved = await storeCustomerConnection({
       customerId: input.customerId,
       businessId: input.businessId,
       token: exchanged.accessToken,
       expiresIn: exchanged.expiresIn,
-      permissions: exchanged.permissions.length ? exchanged.permissions : [...CUSTOMER_INSTAGRAM_PERMISSIONS],
+      permissions: readPermissions.length ? readPermissions : [...CUSTOMER_INSTAGRAM_PERMISSIONS],
       fallbackUserId: exchanged.userId,
     });
     return { ok: true, username: saved.username };
@@ -401,7 +399,7 @@ async function storeCustomerConnection(input: {
       profile.followsCount,
       profile.mediaCount,
       profile.accountType,
-      JSON.stringify(input.permissions.filter((item) => !item.includes("publish"))),
+      JSON.stringify(input.permissions.filter((item) => customerPermissionsSafe([item]))),
       ciphertext,
       expiresAt,
     ],
