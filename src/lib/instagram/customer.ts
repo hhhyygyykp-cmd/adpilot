@@ -6,9 +6,16 @@ import { audit } from "../audit";
 import { getBusiness, updateBusiness } from "../queries/businesses";
 import { deleteMemoryByKind, insertMemory } from "../queries/memory";
 import type { Business } from "../types";
-import { metaAppId, metaAppSecret, metaConfigured, missingMetaSecrets } from "./config";
+import {
+  metaAppId,
+  metaAppSecret,
+  customerUnifiedLoginConfigured,
+  missingCustomerMetaSecrets,
+  metaCustomerConfigurationId,
+} from "./config";
 import {
   CUSTOMER_INSTAGRAM_PERMISSIONS,
+  HOSTED_CUSTOMER_CALLBACK,
   buildCustomerAuthorizationUrl,
   customerInstagramRedirectUri,
   customerPermissionsSafe,
@@ -17,8 +24,10 @@ import {
   customerGraphPublicError,
   customerInstagramGet,
   exchangeCustomerAuthorizationCode,
+  fetchCustomerGraphProfile,
   refreshCustomerToken,
 } from "./customer-graph";
+import { listAvailableInstagramAccounts } from "./meta";
 
 export type CustomerInstagramStatus =
   | "disconnected"
@@ -42,7 +51,7 @@ export type CustomerInstagramPublic = {
   connectedAt: string | null;
   lastSyncedAt: string | null;
   canPublish: false;
-  login: "instagram";
+  login: "unified";
   accessNote: string;
   appReviewNote: string;
 };
@@ -123,7 +132,7 @@ function permissionsOf(row: AccountRow | null): string[] {
 }
 
 function mapPublic(row: AccountRow | null): CustomerInstagramPublic {
-  if (!metaConfigured()) {
+  if (!customerUnifiedLoginConfigured()) {
     return {
       status: "not_configured",
       username: null,
@@ -134,11 +143,11 @@ function mapPublic(row: AccountRow | null): CustomerInstagramPublic {
       mediaCount: null,
       accountType: null,
       permissions: [],
-      lastError: `Add these Cursor secrets, then connect Instagram: ${missingMetaSecrets().join(", ")}.`,
+      lastError: missingCustomerConfigMessage(),
       connectedAt: null,
       lastSyncedAt: null,
       canPublish: false,
-      login: "instagram",
+      login: "unified",
       accessNote: ACCESS_NOTE,
       appReviewNote: APP_REVIEW_NOTE,
     };
@@ -157,10 +166,14 @@ function mapPublic(row: AccountRow | null): CustomerInstagramPublic {
     connectedAt: row?.connected_at ? new Date(row.connected_at).toISOString() : null,
     lastSyncedAt: row?.last_synced_at ? new Date(row.last_synced_at).toISOString() : null,
     canPublish: false,
-    login: "instagram",
+    login: "unified",
     accessNote: ACCESS_NOTE,
     appReviewNote: APP_REVIEW_NOTE,
   };
+}
+
+function missingCustomerConfigMessage(): string {
+  return `Create a second Facebook Login for Business configuration for customer read-only access (instagram_basic and instagram_manage_insights, no publishing). Valid OAuth Redirect URI: ${HOSTED_CUSTOMER_CALLBACK}. Then add its Configuration ID as the Cursor secret META_CUSTOMER_CONFIGURATION_ID. Do not reuse the agency publishing configuration. Missing: ${missingCustomerMetaSecrets().join(", ")}.`;
 }
 
 async function loadAccount(customerId: string, businessId: string): Promise<AccountRow | null> {
@@ -199,9 +212,9 @@ export async function startCustomerInstagramOAuth(input: {
 }): Promise<{ url: string } | { error: string; status: number }> {
   const business = await getBusiness(input.customerId, input.businessId);
   if (!business) return { error: "Business not found", status: 404 };
-  if (!metaConfigured()) {
+  if (!customerUnifiedLoginConfigured()) {
     return {
-      error: `Add these Cursor secrets, then connect Instagram: ${missingMetaSecrets().join(", ")}.`,
+      error: missingCustomerConfigMessage(),
       status: 409,
     };
   }
@@ -215,6 +228,7 @@ export async function startCustomerInstagramOAuth(input: {
   return {
     url: buildCustomerAuthorizationUrl({
       clientId: metaAppId(),
+      configId: metaCustomerConfigurationId(),
       redirectUri: customerInstagramRedirectUri(),
       state,
     }),
@@ -399,33 +413,17 @@ type Profile = {
   accountType: string;
 };
 
-async function fetchCustomerProfile(token: string): Promise<Profile> {
-  const fields = [
-    "user_id",
-    "id",
-    "username",
-    "name",
-    "account_type",
-    "biography",
-    "website",
-    "profile_picture_url",
-    "followers_count",
-    "follows_count",
-    "media_count",
-  ].join(",");
-  const live = await customerInstagramGet<Record<string, unknown>>("/me", token, { fields });
-  return {
-    userId: String(live.user_id || live.id || ""),
-    username: String(live.username || ""),
-    name: String(live.name || ""),
-    biography: String(live.biography || ""),
-    website: String(live.website || ""),
-    profilePictureUrl: String(live.profile_picture_url || ""),
-    followersCount: numberOrNull(live.followers_count),
-    followsCount: numberOrNull(live.follows_count),
-    mediaCount: numberOrNull(live.media_count),
-    accountType: String(live.account_type || ""),
-  };
+async function fetchCustomerProfile(token: string, knownIgUserId?: string | null): Promise<Profile> {
+  let igUserId = (knownIgUserId ?? "").trim();
+  if (!igUserId) {
+    const accounts = await listAvailableInstagramAccounts(token);
+    const selected = accounts[0];
+    if (!selected?.id) {
+      throw new Error("Instagram did not return a professional account. Connect a Business or Creator account.");
+    }
+    igUserId = selected.id;
+  }
+  return fetchCustomerGraphProfile(token, igUserId);
 }
 
 function numberOrNull(value: unknown): number | null {
@@ -609,7 +607,7 @@ export async function analyzeCustomerInstagram(input: {
     );
   }
   try {
-    const profile = await fetchCustomerProfile(liveToken);
+    const profile = await fetchCustomerProfile(liveToken, row.ig_user_id);
     const igUserId = profile.userId || row.ig_user_id || "";
     if (igUserId) {
       await syncMedia({

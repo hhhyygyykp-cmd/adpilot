@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Foundation
 import Security
 import UIKit
@@ -18,6 +19,8 @@ final class AppModel: ObservableObject {
     @Published var customerAnalysis: CustomerAnalysis?
     private var pendingInstagramState: String?
     private var pendingCustomerInstagram: (businessId: String, state: String)?
+    private var instagramLoginSession: ASWebAuthenticationSession?
+    private let instagramLoginPresenter = InstagramLoginPresenter()
 
     var api = APIClient()
     var language: String { customer?.preferredLanguage ?? "en" }
@@ -279,7 +282,7 @@ final class AppModel: ObservableObject {
                 errorMessage = "Meta did not return a login URL."
                 return
             }
-            UIApplication.shared.open(url)
+            openInstagramLogin(url)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -315,6 +318,32 @@ final class AppModel: ObservableObject {
             await loadAgencyQueue()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func openInstagramLogin(_ url: URL) {
+        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "adpilot") { [weak self] callback, error in
+            Task { @MainActor in
+                guard let self else { return }
+                self.instagramLoginSession = nil
+                if let callback {
+                    self.handleIncomingURL(callback)
+                    return
+                }
+                let nsError = error as NSError?
+                if nsError?.domain == ASWebAuthenticationSessionError.errorDomain,
+                   nsError?.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                    return
+                }
+                self.errorMessage = "Instagram login was not completed. You can try Connect Instagram again."
+            }
+        }
+        session.presentationContextProvider = instagramLoginPresenter
+        session.prefersEphemeralWebBrowserSession = false
+        instagramLoginSession = session
+        if !session.start() {
+            instagramLoginSession = nil
+            errorMessage = "Instagram login could not open inside the app."
         }
     }
 
@@ -371,7 +400,7 @@ final class AppModel: ObservableObject {
                 errorMessage = "Instagram did not return a login URL."
                 return
             }
-            UIApplication.shared.open(url)
+            openInstagramLogin(url)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -539,6 +568,15 @@ final class AppModel: ObservableObject {
 struct StoredSession: Codable {
     var token: String
     var csrf: String
+}
+
+final class InstagramLoginPresenter: NSObject, ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+        return scene?.windows.first { $0.isKeyWindow } ?? scene?.windows.first ?? ASPresentationAnchor()
+    }
 }
 
 enum Keychain {

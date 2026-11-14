@@ -39,7 +39,7 @@ async function api(method, path, { token, csrf, body } = {}) {
   } catch {
     data = { raw: text.slice(0, 240) };
   }
-  return { status: response.status, data, location: response.headers.get("location"), text };
+  return { status: response.status, data, text, location: response.headers.get("location") ?? "" };
 }
 
 const sessions = new Map();
@@ -276,24 +276,24 @@ test("OAuth callback returns to the AdPilot app and does not finish linking with
 
   const stolen = "steal-this-authorization-code";
   const missing = await api("GET", `/api/admin/instagram/callback?code=${stolen}`);
-  assert.equal(missing.status, 200);
-  assert.match(missing.text, /adpilot:\/\/instagram/);
-  assert.match(missing.text, /authorization code|expired|Connect/i);
-  assert.equal(missing.text.includes("/admin/settings"), false);
-  assert.equal(missing.text.includes(stolen), false);
-  assert.equal(/IGQW-|EAA[A-Za-z0-9]+/.test(missing.text), false);
+  assert.equal(missing.status, 302);
+  assert.match(missing.location, /^adpilot:\/\/instagram/);
+  assert.match(decodeURIComponent(missing.location.replace(/\+/g, " ")), /authorization code|expired|Connect/i);
+  assert.equal(missing.location.includes("/admin/settings"), false);
+  assert.equal(missing.location.includes(stolen), false);
+  assert.equal(/IGQW-|EAA[A-Za-z0-9]+/.test(missing.location), false);
 
   const unknown = await api("GET", `/api/admin/instagram/callback?code=${stolen}&state=not-a-stored-state`);
-  assert.equal(unknown.status, 200);
-  assert.match(unknown.text, /adpilot:\/\/instagram/);
-  assert.match(unknown.text, /expired|Connect Instagram again/i);
-  assert.equal(unknown.text.includes(stolen), false);
+  assert.equal(unknown.status, 302);
+  assert.match(unknown.location, /^adpilot:\/\/instagram/);
+  assert.match(decodeURIComponent(unknown.location.replace(/\+/g, " ")), /expired|Connect Instagram again/i);
+  assert.equal(unknown.location.includes(stolen), false);
 
   const admin = await registerOrLogin("demo@adpilot.local", "DemoPass123", "Demo Owner");
   const before = await api("GET", "/api/admin/instagram", { token: admin.token, csrf: admin.csrf });
   assert.equal(before.data.instagram?.status === "connected", false);
   const after = await api("GET", `/api/admin/instagram/callback?code=${stolen}&state=not-a-stored-state`);
-  assert.equal(after.status, 200);
+  assert.equal(after.status, 302);
   const still = await api("GET", "/api/admin/instagram", { token: admin.token, csrf: admin.csrf });
   assert.equal(still.data.instagram?.status === "connected", false);
 

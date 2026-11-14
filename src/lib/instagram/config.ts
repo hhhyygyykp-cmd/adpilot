@@ -38,6 +38,22 @@ export function metaConfigurationId(): string {
   return (process.env.META_CONFIGURATION_ID ?? "").trim();
 }
 
+export function metaCustomerConfigurationId(): string {
+  return (process.env.META_CUSTOMER_CONFIGURATION_ID ?? "").trim();
+}
+
+export function customerUnifiedLoginConfigured(): boolean {
+  return missingCustomerMetaSecrets().length === 0;
+}
+
+export function missingCustomerMetaSecrets(): string[] {
+  const missing: string[] = [];
+  if (!metaAppId()) missing.push("META_APP_ID");
+  if (!metaAppSecret()) missing.push("META_APP_SECRET");
+  if (!metaCustomerConfigurationId()) missing.push("META_CUSTOMER_CONFIGURATION_ID");
+  return missing;
+}
+
 export function metaPublicOriginOverride(): string {
   return (process.env.META_PUBLIC_ORIGIN ?? "").trim().replace(/\/$/, "");
 }
