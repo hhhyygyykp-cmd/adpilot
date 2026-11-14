@@ -29,7 +29,7 @@ async function api(method, path, { token, csrf, body } = {}) {
   } catch {
     data = { raw: text.slice(0, 240) };
   }
-  return { status: response.status, data, text };
+  return { status: response.status, data, text, location: response.headers.get("location") ?? "" };
 }
 
 async function register(email, password, name) {
@@ -118,9 +118,10 @@ test("customer Instagram routes stay owned and cannot publish", async () => {
 
   const stolen = "steal-customer-code";
   const callback = await api("GET", `/api/instagram/customer/callback?code=${stolen}&state=not-stored`);
-  assert.equal(callback.status, 200);
-  assert.match(callback.text, /adpilot:\/\/instagram-customer/);
-  assert.equal(callback.text.includes(stolen), false);
+  assert.equal(callback.status, 302);
+  assert.match(callback.location, /^adpilot:\/\/instagram-customer/);
+  assert.equal(callback.location.includes(stolen), false);
+  assert.equal(callback.location.includes("/business/"), false);
   assert.equal(callback.text.includes("/admin/instagram"), false);
 
   const still = await api("GET", `/api/businesses/${otherId}/instagram`, { token: b.token, csrf: b.csrf });
