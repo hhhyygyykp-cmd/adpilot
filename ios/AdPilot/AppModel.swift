@@ -279,7 +279,7 @@ final class AppModel: ObservableObject {
                 errorMessage = "Meta did not return a login URL."
                 return
             }
-            UIApplication.shared.open(url)
+            await UIApplication.shared.open(url)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -371,7 +371,7 @@ final class AppModel: ObservableObject {
                 errorMessage = "Instagram did not return a login URL."
                 return
             }
-            UIApplication.shared.open(url)
+            await UIApplication.shared.open(url)
         } catch {
             errorMessage = error.localizedDescription
         }

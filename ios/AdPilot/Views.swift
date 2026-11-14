@@ -1552,7 +1552,7 @@ struct AgencyQueueView: View {
                 .font(AppFont.caption)
                 .foregroundStyle(AppColor.mutedForeground)
             Text(destinationHandle)
-                .font(AppFont.title)
+                .font(AppFont.screenTitle)
                 .foregroundStyle(AppColor.foreground)
             Text(
                 connected && exact
