@@ -1165,6 +1165,7 @@ struct BusinessTab: View {
 
 struct BusinessChat: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
     let businessId: String
     @State private var business: Business?
     @State private var draft = ""
@@ -1233,6 +1234,11 @@ struct BusinessChat: View {
         .scrollDismissesKeyboard(.interactively)
         .background(AppColor.background)
         .task { await reload() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await reload() }
+            }
+        }
     }
 
     @ViewBuilder

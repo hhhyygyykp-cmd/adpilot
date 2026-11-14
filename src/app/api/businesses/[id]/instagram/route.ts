@@ -6,6 +6,7 @@ import {
   disconnectCustomerInstagram,
   getCustomerInstagramPublic,
   getLatestAnalysis,
+  resumePendingCustomerInstagram,
   type InferredInsights,
 } from "@/lib/instagram/customer";
 import { getBusiness } from "@/lib/queries/businesses";
@@ -21,6 +22,7 @@ export async function GET(request: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   const business = await getBusiness(auth.customer.id, id);
   if (!business) return errorJson("Business not found", 404);
+  await resumePendingCustomerInstagram(auth.customer.id, id);
   return json({
     instagram: await getCustomerInstagramPublic(auth.customer.id, id),
     analysis: await getLatestAnalysis(auth.customer.id, id),
