@@ -206,6 +206,22 @@ export async function getCustomerInstagramPublic(
   return mapPublic(await loadAccount(customerId, businessId));
 }
 
+/** Finish a Meta login that already returned a code, even if the phone did not open the app link. */
+export async function resumePendingCustomerInstagram(customerId: string, businessId: string): Promise<void> {
+  const pending = await sql<{ state: string }>(
+    `select state from customer_instagram_oauth_states
+     where customer_id = $1 and business_id = $2
+       and authorization_code is not null
+       and expires_at > now()
+     order by expires_at desc
+     limit 1`,
+    [customerId, businessId],
+  );
+  const state = pending[0]?.state;
+  if (!state) return;
+  await completeCustomerInstagramOAuth({ customerId, businessId, state });
+}
+
 export async function startCustomerInstagramOAuth(input: {
   customerId: string;
   businessId: string;
