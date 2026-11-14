@@ -123,8 +123,7 @@ type AccountRow = {
 const ACCESS_NOTE =
   "AdPilot reads your public professional profile, posts, captions, and available insights to understand your brand. It never posts from your account.";
 
-const APP_REVIEW_NOTE =
-  "Other customers’ Instagram accounts need Meta App Review. Until then, only tester accounts can connect. Insights may be missing until Meta approves that access.";
+const APP_REVIEW_NOTE = "";
 
 function permissionsOf(row: AccountRow | null): string[] {
   const raw = parseJson<string[]>(row?.permissions, []);
