@@ -191,7 +191,7 @@ export function generateImageRefused(): ToolErr {
     tool: "generate_image",
     ok: false,
     error:
-      "Call POST /api/campaigns/:id/generate after confirm. Paid fal stills need an explicit authorize. The free still is drawn on AdPilot and is not sent to an outside image service.",
+      "A tool argument cannot authorize a paid still. The customer confirms the displayed price in the app. The free still is drawn on AdPilot and is not sent to an outside image service.",
   };
 }
 
@@ -200,7 +200,7 @@ export function generateVideoRefused(): ToolErr {
     tool: "generate_video",
     ok: false,
     error:
-      "Paid Kling 2.5 Turbo Pro video on fal needs FAL_KEY and an explicit Generate click. Nothing was labeled as video.",
+      "A tool argument cannot authorize a paid video. The customer confirms the displayed price in the app. Nothing was labeled as video.",
   };
 }
 

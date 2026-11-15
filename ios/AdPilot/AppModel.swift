@@ -216,7 +216,11 @@ final class AppModel: ObservableObject {
             let payload: GeneratePayload = try await api.send(
                 "POST",
                 "/api/campaigns/\(id)/generate",
-                body: ["authorizePaid": authorizePaid, "video": campaign?.mediaQuote?.wantsVideo ?? false],
+                body: [
+                    "authorizePaid": authorizePaid,
+                    "acceptedQuoteUsd": authorizePaid ? (campaign?.mediaQuote?.totalUsd ?? -1) : 0,
+                    "video": campaign?.mediaQuote?.wantsVideo ?? false,
+                ],
                 timeout: 600
             )
             campaign = payload.campaign

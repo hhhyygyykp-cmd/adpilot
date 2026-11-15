@@ -37,6 +37,13 @@ export function redactFalMessage(message: string): string {
   return cleaned.slice(0, 240) || "fal request failed";
 }
 
+export function providerFailureReport(
+  error: unknown,
+  fallback = "The provider did not return a file.",
+): { savedFile: false; note: string } {
+  return { savedFile: false, note: publicFalError(error, fallback) };
+}
+
 export function publicFalError(error: unknown, fallback = "fal request failed"): string {
   const status = statusOf(error);
   if (status === 401) {
