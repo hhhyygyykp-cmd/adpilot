@@ -16,6 +16,7 @@ export default function BusinessDetailPage() {
   const [business, setBusiness] = useState<Business | null>(null);
   const [assets, setAssets] = useState<BusinessAsset[]>([]);
   const [error, setError] = useState("");
+  const [overviewOpen, setOverviewOpen] = useState(false);
 
   const load = useCallback(async () => {
     const data = await api<{ business: Business; assets: BusinessAsset[] }>(
@@ -84,8 +85,19 @@ export default function BusinessDetailPage() {
           />
         </div>
       ) : (
+        <div className="panel mt-8 rounded-3xl p-6">
+          <button
+            type="button"
+            onClick={() => setOverviewOpen((open) => !open)}
+            className="flex w-full items-center justify-between text-left"
+            aria-expanded={overviewOpen}
+          >
+            <span className="serif text-2xl">{t("business.instagram.overview")}</span>
+            <span aria-hidden="true">{overviewOpen ? "▴" : "▾"}</span>
+          </button>
+        {overviewOpen ? (
         <form
-          className="panel mt-8 grid gap-4 rounded-3xl p-6 md:grid-cols-2"
+          className="mt-6 grid gap-4 md:grid-cols-2"
           onSubmit={async (event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
@@ -148,6 +160,8 @@ export default function BusinessDetailPage() {
             </button>
           </div>
         </form>
+        ) : null}
+        </div>
       )}
 
       <Suspense fallback={null}>

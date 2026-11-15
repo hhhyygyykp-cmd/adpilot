@@ -1178,6 +1178,7 @@ struct BusinessChat: View {
     @State private var opportunities = ""
     @State private var approaches = ""
     @State private var overviewOpen = false
+    @State private var profileOpen = false
 
     var body: some View {
         ScrollView {
@@ -1197,10 +1198,21 @@ struct BusinessChat: View {
                         }
                     }
                     customerInstagramSection
+                    if business.onboardingComplete {
+                        DisclosureGroup(isExpanded: $profileOpen) {
+                            ForEach(business.onboardingState.messages) { message in
+                                ChatBubble(text: message.text, isUser: message.role == "customer")
+                            }
+                        } label: {
+                            Text(Copy.text("Business overview", "نظرة عامة", language: model.language))
+                                .font(AppFont.section)
+                                .foregroundStyle(AppColor.foreground)
+                        }
+                        .tint(AppColor.primary)
+                    } else {
                     ForEach(business.onboardingState.messages) { message in
                         ChatBubble(text: message.text, isUser: message.role == "customer")
                     }
-                    if !business.onboardingComplete {
                         ChatComposer(
                             text: $draft,
                             placeholder: Copy.text("Your answer", "إجابتك", language: model.language),
@@ -1242,6 +1254,9 @@ struct BusinessChat: View {
         }
         .onChange(of: model.customerAnalysis?.status) { _, status in
             if status == "confirmed" { overviewOpen = false }
+        }
+        .onChange(of: business?.onboardingComplete) { _, complete in
+            if complete == true { profileOpen = false }
         }
     }
 
