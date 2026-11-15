@@ -1208,6 +1208,22 @@ struct BusinessChat: View {
                                 ChatBubble(text: message.text, isUser: message.role == "customer")
                             }
                         }
+                        ChatComposer(
+                            text: $draft,
+                            placeholder: Copy.text("Tell me what to change", "قل لي ماذا أغيّر", language: model.language),
+                            sendTitle: Copy.text("Send", "إرسال", language: model.language),
+                            onSend: {
+                                Keyboard.dismiss()
+                                let text = draft
+                                draft = ""
+                                Task {
+                                    model.errorMessage = nil
+                                    await send(text: text)
+                                    profileOpen = true
+                                    AppHaptic.notify(success: model.errorMessage == nil)
+                                }
+                            }
+                        )
                     } else {
                     ForEach(business.onboardingState.messages) { message in
                         ChatBubble(text: message.text, isUser: message.role == "customer")

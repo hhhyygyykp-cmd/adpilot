@@ -10,6 +10,7 @@ import type {
   ChatMessage,
   Language,
 } from "../types";
+import { businessEditReply, parseBusinessEdit } from "../conversation/business-edit";
 import { isAffirmation, senseBusiness, senseLine, type BusinessSense } from "../conversation/business-sense";
 import {
   BUSINESS_FIELDS,
@@ -362,6 +363,25 @@ export async function continueBusinessOnboarding(input: {
   }
 
   if (!field) {
+    const text = input.text.trim();
+    if (input.business.onboardingComplete && text && !input.skip) {
+      const edit = parseBusinessEdit(text);
+      messages.push(message("customer", text));
+      if (edit) next = applyBusinessAnswer(next, edit.key, edit.value);
+      messages.push(
+        message(
+          "agent",
+          businessEditReply({
+            key: edit?.key ?? null,
+            value: edit?.value ?? "",
+            language: input.language,
+          }),
+        ),
+      );
+      next.onboardingComplete = true;
+      next.onboardingState = { messages, awaiting: null };
+      return persistBusiness(next, true);
+    }
     next.onboardingComplete = true;
     next.onboardingState = { messages, awaiting: null };
     return persistBusiness(next, true);
