@@ -1177,6 +1177,7 @@ struct BusinessChat: View {
     @State private var audience = ""
     @State private var opportunities = ""
     @State private var approaches = ""
+    @State private var overviewOpen = false
 
     var body: some View {
         ScrollView {
@@ -1238,6 +1239,9 @@ struct BusinessChat: View {
             if phase == .active {
                 Task { await reload() }
             }
+        }
+        .onChange(of: model.customerAnalysis?.status) { _, status in
+            if status == "confirmed" { overviewOpen = false }
         }
     }
 
@@ -1308,61 +1312,17 @@ struct BusinessChat: View {
                 Task { await model.disconnectCustomerInstagram(businessId) }
             }
             if let analysis = model.customerAnalysis, analysis.inferred != nil {
-                Text(Copy.text("Here's what AdPilot learned about your business.", "إليك ما تعلّمه أدبايلوت عن عملك.", language: model.language))
-                    .font(AppFont.section)
-                    .foregroundStyle(AppColor.foreground)
-                    .padding(.top, AppSpacing.sm)
-                if analysis.inferred?.preliminary == true {
-                    Text(Copy.text(
-                        "Few posts were available, so these recommendations are preliminary.",
-                        "عدد المنشورات قليل، لذا هذه التوصيات أولية.",
-                        language: model.language
-                    ))
-                    .font(AppFont.caption)
-                    .foregroundStyle(AppColor.mutedForeground)
-                }
-                Text(
-                    analysis.inferred?.visionUsed == true
-                        ? Copy.text("AdPilot looked at retrieved images when describing visual identity.", "اطّلع أدبايلوت على الصور المسترجعة عند وصف الهوية البصرية.", language: model.language)
-                        : Copy.text("Images were not visually analyzed. This is based on captions and profile text.", "لم تُحلَّل الصور بصرياً. هذا من التعليقات ونص الملف الشخصي.", language: model.language)
-                )
-                .font(AppFont.caption)
-                .foregroundStyle(AppColor.mutedForeground)
-                if let note = analysis.retrieved?.insights?.note, !note.isEmpty {
-                    Text(note)
-                        .font(AppFont.caption)
-                        .foregroundStyle(AppColor.mutedForeground)
-                }
-                insightField(Copy.text("Business overview", "نظرة عامة", language: model.language), text: $overview)
-                insightField(Copy.text("Products and services", "المنتجات والخدمات", language: model.language), text: $products)
-                insightField(Copy.text("Brand personality", "شخصية العلامة", language: model.language), text: $personality)
-                insightField(Copy.text("Visual identity", "الهوية البصرية", language: model.language), text: $visual)
-                insightField(Copy.text("Content themes", "موضوعات المحتوى", language: model.language), text: $themes)
-                insightField(Copy.text("Potential audience", "الجمهور المحتمل", language: model.language), text: $audience)
-                insightField(Copy.text("Marketing opportunities", "فرص تسويقية", language: model.language), text: $opportunities)
-                insightField(Copy.text("Recommended advertising approaches", "أساليب إعلانية موصى بها", language: model.language), text: $approaches)
-                AppButton(
-                    Copy.text("Edit and confirm", "عدّل وأكّد", language: model.language),
-                    isEnabled: !model.busy && analysis.id != nil
-                ) {
-                    Task {
-                        guard let id = analysis.id, var inferred = analysis.inferred else { return }
-                        inferred = InferredInsights(
-                            overview: overview,
-                            productsServices: products,
-                            brandPersonality: personality,
-                            visualIdentity: visual,
-                            contentThemes: themes,
-                            audience: audience,
-                            opportunities: opportunities,
-                            recommendedApproaches: approaches,
-                            confidence: inferred.confidence,
-                            preliminary: inferred.preliminary,
-                            visionUsed: inferred.visionUsed
-                        )
-                        await model.confirmCustomerInstagram(businessId, analysisId: id, inferred: inferred)
-                        AppHaptic.notify(success: model.errorMessage == nil)
+                if analysis.status == "confirmed" {
+                    DisclosureGroup(isExpanded: $overviewOpen) {
+                        learnedDetails(analysis)
+                    } label: {
+                        Text(Copy.text("Business overview", "نظرة عامة", language: model.language))
+                            .font(AppFont.section)
+                            .foregroundStyle(AppColor.foreground)
                     }
+                    .tint(AppColor.primary)
+                } else {
+                    learnedDetails(analysis)
                 }
             }
         }
@@ -1370,6 +1330,67 @@ struct BusinessChat: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppColor.card)
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func learnedDetails(_ analysis: CustomerAnalysis) -> some View {
+        Text(Copy.text("Here's what AdPilot learned about your business.", "إليك ما تعلّمه أدبايلوت عن عملك.", language: model.language))
+            .font(AppFont.section)
+            .foregroundStyle(AppColor.foreground)
+            .padding(.top, AppSpacing.sm)
+        if analysis.inferred?.preliminary == true {
+            Text(Copy.text(
+                "Few posts were available, so these recommendations are preliminary.",
+                "عدد المنشورات قليل، لذا هذه التوصيات أولية.",
+                language: model.language
+            ))
+            .font(AppFont.caption)
+            .foregroundStyle(AppColor.mutedForeground)
+        }
+        Text(
+            analysis.inferred?.visionUsed == true
+                ? Copy.text("AdPilot looked at retrieved images when describing visual identity.", "اطّلع أدبايلوت على الصور المسترجعة عند وصف الهوية البصرية.", language: model.language)
+                : Copy.text("Images were not visually analyzed. This is based on captions and profile text.", "لم تُحلَّل الصور بصرياً. هذا من التعليقات ونص الملف الشخصي.", language: model.language)
+        )
+        .font(AppFont.caption)
+        .foregroundStyle(AppColor.mutedForeground)
+        if let note = analysis.retrieved?.insights?.note, !note.isEmpty {
+            Text(note)
+                .font(AppFont.caption)
+                .foregroundStyle(AppColor.mutedForeground)
+        }
+        insightField(Copy.text("Business overview", "نظرة عامة", language: model.language), text: $overview)
+        insightField(Copy.text("Products and services", "المنتجات والخدمات", language: model.language), text: $products)
+        insightField(Copy.text("Brand personality", "شخصية العلامة", language: model.language), text: $personality)
+        insightField(Copy.text("Visual identity", "الهوية البصرية", language: model.language), text: $visual)
+        insightField(Copy.text("Content themes", "موضوعات المحتوى", language: model.language), text: $themes)
+        insightField(Copy.text("Potential audience", "الجمهور المحتمل", language: model.language), text: $audience)
+        insightField(Copy.text("Marketing opportunities", "فرص تسويقية", language: model.language), text: $opportunities)
+        insightField(Copy.text("Recommended advertising approaches", "أساليب إعلانية موصى بها", language: model.language), text: $approaches)
+        AppButton(
+            Copy.text("Edit and confirm", "عدّل وأكّد", language: model.language),
+            isEnabled: !model.busy && analysis.id != nil
+        ) {
+            Task {
+                guard let id = analysis.id, var inferred = analysis.inferred else { return }
+                inferred = InferredInsights(
+                    overview: overview,
+                    productsServices: products,
+                    brandPersonality: personality,
+                    visualIdentity: visual,
+                    contentThemes: themes,
+                    audience: audience,
+                    opportunities: opportunities,
+                    recommendedApproaches: approaches,
+                    confidence: inferred.confidence,
+                    preliminary: inferred.preliminary,
+                    visionUsed: inferred.visionUsed
+                )
+                await model.confirmCustomerInstagram(businessId, analysisId: id, inferred: inferred)
+                overviewOpen = false
+                AppHaptic.notify(success: model.errorMessage == nil)
+            }
+        }
     }
 
     private func insightField(_ label: String, text: Binding<String>) -> some View {
