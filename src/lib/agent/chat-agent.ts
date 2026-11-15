@@ -194,28 +194,13 @@ export async function executeMarketingTool(input: {
     }
     case "generate_image_ad":
     case "generate_video_ad": {
-      if (input.args.approved !== true) {
-        return { ok: false, error: "Paid generation needs an explicit customer confirmation. No media call was made." };
-      }
-      const campaignId = typeof input.args.campaignId === "string" ? input.args.campaignId : "";
-      const campaign = campaignId ? await getCampaign(input.customerId, campaignId) : null;
-      if (!campaign || campaign.businessId !== business.id) {
-        return { ok: false, error: "Campaign not found for this business." };
-      }
-      if (campaign.generationStatus === "generating" || campaign.generationStatus === "ready") {
-        return { ok: false, error: "A generation for this campaign is already underway or finished. No duplicate paid call was made." };
-      }
-      if (campaign.status !== "confirmed") {
-        return { ok: false, error: "Confirm the brief before generation. No media call was made." };
-      }
-      const { generateCampaignMedia } = await import("../queries/creatives");
-      const result = await generateCampaignMedia({
-        campaign,
-        business,
-        authorizePaid: true,
-        wantVideo: input.name === "generate_video_ad",
-      });
-      return { ok: true, data: { status: result.status, note: result.note, generated: result.status === "ready" } };
+      // The model supplies tool arguments; approved=true is NOT user consent.
+      // Paid media must go through the authenticated campaign generation route
+      // with a real customer confirmation, ownership, and budget checks.
+      return {
+        ok: false,
+        error: "Review the campaign and media quote, then confirm generation in the app. Chat cannot authorize paid media.",
+      };
     }
     case "get_campaign_status": {
       const campaignId = typeof input.args.campaignId === "string" ? input.args.campaignId : "";
