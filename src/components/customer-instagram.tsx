@@ -16,51 +16,18 @@ type InstagramPublic = {
   canPublish: boolean;
 };
 
-type Inferred = {
-  overview: string;
-  productsServices: string;
-  brandPersonality: string;
-  visualIdentity: string;
-  contentThemes: string;
-  audience: string;
-  opportunities: string;
-  recommendedApproaches: string;
-  confidence: string;
-  preliminary: boolean;
-  visionUsed: boolean;
-};
-
-type AnalysisPublic = {
-  id: string | null;
-  status: string;
-  inferred: Inferred | null;
-  retrieved: {
-    profile?: { username?: string; biography?: string; followersCount?: number | null };
-    posting?: { count?: number; frequency?: string };
-    insights?: { available?: boolean; note?: string };
-  } | null;
-  visionUsed: boolean;
-  mediaCount: number;
-  lastError: string;
-};
-
 export function CustomerInstagramPanel({ businessId }: { businessId: string }) {
   const { t } = useSession();
   const params = useSearchParams();
   const [instagram, setInstagram] = useState<InstagramPublic | null>(null);
-  const [analysis, setAnalysis] = useState<AnalysisPublic | null>(null);
-  const [inferred, setInferred] = useState<Inferred | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
-  const [overviewOpen, setOverviewOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const data = await api<{ instagram: InstagramPublic; analysis: AnalysisPublic }>(
+    const data = await api<{ instagram: InstagramPublic }>(
       `/api/businesses/${businessId}/instagram`,
     );
     setInstagram(data.instagram);
-    setAnalysis(data.analysis);
-    setInferred(data.analysis.inferred);
   }, [businessId]);
 
   useEffect(() => {
@@ -92,14 +59,11 @@ export function CustomerInstagramPanel({ businessId }: { businessId: string }) {
         window.location.href = data.url;
         return;
       }
-      const data = await api<{ instagram: InstagramPublic; analysis: AnalysisPublic }>(
+      const data = await api<{ instagram: InstagramPublic }>(
         `/api/businesses/${businessId}/instagram`,
         { method: "POST", body: JSON.stringify({ action, ...extra }) },
       );
       setInstagram(data.instagram);
-      setAnalysis(data.analysis);
-      setInferred(data.analysis.inferred);
-      if (action === "confirm") setOverviewOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
@@ -136,78 +100,12 @@ export function CustomerInstagramPanel({ businessId }: { businessId: string }) {
         <button
           type="button"
           disabled={!connected || Boolean(busy)}
-          onClick={() => run("analyze")}
-          className="rounded-full border border-[var(--line)] px-5 py-2 text-sm"
-        >
-          {t("business.instagram.analyze")}
-        </button>
-        <button
-          type="button"
-          disabled={!connected || Boolean(busy)}
           onClick={() => run("disconnect")}
           className="rounded-full border border-[var(--line)] px-5 py-2 text-sm"
         >
           {t("business.instagram.disconnect")}
         </button>
       </div>
-      {analysis?.inferred && inferred ? (
-        <div className="mt-8 space-y-4">
-          <button
-            type="button"
-            onClick={() => setOverviewOpen((open) => !open)}
-            className="flex w-full items-center justify-between text-left"
-            aria-expanded={overviewOpen}
-          >
-            <span className="serif text-2xl">{t("business.instagram.overview")}</span>
-            <span aria-hidden="true">{overviewOpen ? "▴" : "▾"}</span>
-          </button>
-          {overviewOpen ? (
-            <>
-          <h3 className="serif text-2xl">{t("business.instagram.learned")}</h3>
-          <p className="text-xs text-[var(--gold)]">{t("business.instagram.inferred")}</p>
-          {inferred.preliminary ? (
-            <p className="text-sm text-[var(--muted)]">{t("business.instagram.preliminary")}</p>
-          ) : null}
-          <p className="text-sm text-[var(--muted)]">
-            {inferred.visionUsed ? t("business.instagram.visionUsed") : t("business.instagram.captionsOnly")}
-          </p>
-          {analysis.retrieved?.insights?.note ? (
-            <p className="text-sm text-[var(--muted)]">{analysis.retrieved.insights.note}</p>
-          ) : null}
-          {(
-            [
-              ["overview", "overview"],
-              ["products", "productsServices"],
-              ["personality", "brandPersonality"],
-              ["visual", "visualIdentity"],
-              ["themes", "contentThemes"],
-              ["audience", "audience"],
-              ["opportunities", "opportunities"],
-              ["approaches", "recommendedApproaches"],
-            ] as const
-          ).map(([label, key]) => (
-            <label key={key} className="block text-sm">
-              {t(`business.instagram.${label}`)}
-              <textarea
-                value={inferred[key]}
-                onChange={(event) => setInferred({ ...inferred, [key]: event.target.value })}
-                rows={3}
-                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-black/20 px-4 py-3"
-              />
-            </label>
-          ))}
-          <button
-            type="button"
-            disabled={!analysis.id || Boolean(busy)}
-            onClick={() => run("confirm", { analysisId: analysis.id, inferred })}
-            className="rounded-full bg-[var(--gold)] px-5 py-2 text-sm text-[var(--ink)]"
-          >
-            {t("business.instagram.confirm")}
-          </button>
-            </>
-          ) : null}
-        </div>
-      ) : null}
     </section>
   );
 }
