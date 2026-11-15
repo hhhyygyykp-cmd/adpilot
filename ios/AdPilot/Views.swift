@@ -1327,18 +1327,14 @@ struct BusinessChat: View {
                 Task { await model.disconnectCustomerInstagram(businessId) }
             }
             if let analysis = model.customerAnalysis, analysis.inferred != nil {
-                if analysis.status == "confirmed" {
-                    DisclosureGroup(isExpanded: $overviewOpen) {
-                        learnedDetails(analysis)
-                    } label: {
-                        Text(Copy.text("Business overview", "نظرة عامة", language: model.language))
-                            .font(AppFont.section)
-                            .foregroundStyle(AppColor.foreground)
-                    }
-                    .tint(AppColor.primary)
-                } else {
+                DisclosureGroup(isExpanded: $overviewOpen) {
                     learnedDetails(analysis)
+                } label: {
+                    Text(Copy.text("Business overview", "نظرة عامة", language: model.language))
+                        .font(AppFont.section)
+                        .foregroundStyle(AppColor.foreground)
                 }
+                .tint(AppColor.primary)
             }
         }
         .padding(AppSpacing.md)
