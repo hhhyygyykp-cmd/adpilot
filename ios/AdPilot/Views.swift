@@ -1210,7 +1210,7 @@ struct BusinessChat: View {
                         }
                         ChatComposer(
                             text: $draft,
-                            placeholder: Copy.text("Tell me what to change", "قل لي ماذا أغيّر", language: model.language),
+                            placeholder: Copy.text("Talk to AdPilot", "تحدث مع أدبايلوت", language: model.language),
                             sendTitle: Copy.text("Send", "إرسال", language: model.language),
                             onSend: {
                                 Keyboard.dismiss()
