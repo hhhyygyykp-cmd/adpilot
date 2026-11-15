@@ -11,6 +11,7 @@ import type {
   ChatMessage,
   Language,
 } from "../types";
+import { runMarketingChat } from "../agent/chat-agent";
 import { businessEditReply, parseBusinessEdit } from "../conversation/business-edit";
 import { isAffirmation, senseBusiness, senseLine, type BusinessSense } from "../conversation/business-sense";
 import {
@@ -324,6 +325,18 @@ async function replyAsBusinessAgent(input: {
 }): Promise<Business> {
   const messages = [...input.messages, message("customer", input.text)];
   let next = { ...input.business };
+  if (/\b(ad|ads|advert|campaign|orders?|customers?|promote|marketing|video)\b|إعلان|طلبات|زبائن/i.test(input.text)) {
+    const marketing = await runMarketingChat({
+      customerId: next.customerId,
+      business: next,
+      text: input.text,
+      language: input.language,
+    });
+    messages.push(message("agent", marketing.reply));
+    next.onboardingComplete = true;
+    next.onboardingState = { messages, awaiting: null };
+    return persistBusiness(next, true);
+  }
   const agent = await askBusinessAgent({
     text: input.text,
     business: next,
