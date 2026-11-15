@@ -21,7 +21,7 @@ export function BriefCard({
     conceptId?: ConceptLane;
     useRecommended?: boolean;
   }) => Promise<void>;
-  onGenerate?: (body: { authorizePaid?: boolean; video?: boolean }) => Promise<void>;
+  onGenerate?: (body: { authorizePaid?: boolean; acceptedQuoteUsd?: number; video?: boolean }) => Promise<void>;
   onApprove?: (body: {
     creativeId: string;
     caption: string;

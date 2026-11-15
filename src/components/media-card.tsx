@@ -14,7 +14,7 @@ export function MediaCard({
   busy,
 }: {
   campaign: Campaign;
-  onGenerate?: (body: { authorizePaid?: boolean; video?: boolean }) => Promise<void>;
+  onGenerate?: (body: { authorizePaid?: boolean; acceptedQuoteUsd?: number; video?: boolean }) => Promise<void>;
   onApprove?: (body: {
     creativeId: string;
     caption: string;
@@ -95,7 +95,13 @@ export function MediaCard({
           <button
             type="button"
             disabled={busy || !canPay}
-            onClick={() => onGenerate({ authorizePaid: true, video: quote.wantsVideo })}
+            onClick={() =>
+              onGenerate({
+                authorizePaid: true,
+                acceptedQuoteUsd: quote.totalUsd,
+                video: quote.wantsVideo,
+              })
+            }
             className="rounded-full bg-[var(--gold)] px-5 py-2.5 text-sm font-medium text-[var(--ink)] disabled:opacity-40"
           >
             {busy ? t("media.workingPaid") : t("media.generatePaid")}

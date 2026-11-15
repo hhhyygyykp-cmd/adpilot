@@ -8,7 +8,7 @@ import { composeStillAd } from "../media/compose-still";
 import { composeVideoAd } from "../media/compose-video";
 import { downloadFalFile, falGenerateStill, falGenerateVideo } from "../media/fal";
 import { findCompletedFalVideos } from "../media/fal-recover";
-import { publicFalError } from "../media/fal-key";
+import { providerFailureReport } from "../media/fal-key";
 import { sniff } from "../media/sniff";
 import { localPreviewStill } from "../media/local-still";
 import { buildImagePrompt, buildVideoPrompt } from "../media/prompt";
@@ -158,18 +158,26 @@ export async function generateCampaignMedia(input: {
   business: Business;
   authorizePaid: boolean;
   wantVideo: boolean;
-}): Promise<{ status: GenerationStatus; note: string }> {
+}): Promise<{ status: GenerationStatus; note: string; duplicate?: boolean }> {
   const campaign = input.campaign;
   const prompt = buildImagePrompt(campaign, input.business);
   const videoPrompt = buildVideoPrompt(campaign, input.business);
   const wantsVideo = input.wantVideo || campaignWantsVideo(campaign);
   const keyReady = falKeyConfigured();
 
-  await sql(
+  const locked = await sql<{ id: string }>(
     `update campaigns set generation_status = 'generating', generation_note = '', updated_at = now()
-     where id = $1 and customer_id = $2`,
+     where id = $1 and customer_id = $2 and generation_status <> 'generating'
+     returning id`,
     [campaign.id, campaign.customerId],
   );
+  if (locked.length === 0) {
+    return {
+      status: "generating",
+      note: "Generation is already running. No duplicate paid call was made.",
+      duplicate: true,
+    };
+  }
 
   try {
     const brand = await loadBrandMedia(campaign.customerId, campaign.businessId);
@@ -209,7 +217,7 @@ export async function generateCampaignMedia(input: {
     await finish(campaign, "ready", note);
     return { status: "ready", note };
   } catch (error) {
-    const message = publicFalError(error, "Generation failed");
+    const message = providerFailureReport(error, "Generation failed").note;
     const existing = await listCreatives(campaign.customerId, campaign.id);
     const images = existing.filter((item) => item.kind === "image");
     if (images.some((item) => item.provider === "fal")) {
@@ -367,7 +375,7 @@ async function generatePaid(input: {
     video = await falGenerateVideo(videoPrompt, campaign.customerId);
   } catch (error) {
     await releasePaidSlot(campaign, "video");
-    const reason = publicFalError(error, "The video service did not return a file.");
+    const reason = providerFailureReport(error, "The video service did not return a file.").note;
     const note = `${notes.join(" ")} The video was not created, so the video price was not charged. ${reason}`.trim();
     await finish(campaign, notes.length > 0 || alreadyHasStill ? "ready" : "failed", note);
     return { status: notes.length > 0 || alreadyHasStill ? "ready" : "failed", note };
@@ -389,7 +397,7 @@ async function generatePaid(input: {
     });
   } catch (error) {
     await releasePaidSlot(campaign, "video");
-    const reason = publicFalError(error, "The advertisement edit failed.");
+    const reason = providerFailureReport(error, "The advertisement edit failed.").note;
     const note = `${notes.join(" ")} fal returned a clip, but the title and call-to-action edit failed, so the unfinished clip was not saved. ${reason}`.trim();
     await finish(campaign, "ready", note);
     return { status: "ready", note };
