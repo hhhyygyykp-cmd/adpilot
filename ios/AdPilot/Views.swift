@@ -1199,16 +1199,24 @@ struct BusinessChat: View {
                     }
                     customerInstagramSection
                     if business.onboardingComplete {
-                        DisclosureGroup(isExpanded: $profileOpen) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) { profileOpen.toggle() }
+                        } label: {
+                            HStack {
+                                Text(Copy.text("Business overview", "نظرة عامة", language: model.language))
+                                    .font(AppFont.section)
+                                    .foregroundStyle(AppColor.foreground)
+                                Spacer()
+                                Image(systemName: profileOpen ? "chevron.up" : "chevron.down")
+                                    .foregroundStyle(AppColor.primary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        if profileOpen {
                             ForEach(business.onboardingState.messages) { message in
                                 ChatBubble(text: message.text, isUser: message.role == "customer")
                             }
-                        } label: {
-                            Text(Copy.text("Business overview", "نظرة عامة", language: model.language))
-                                .font(AppFont.section)
-                                .foregroundStyle(AppColor.foreground)
                         }
-                        .tint(AppColor.primary)
                     } else {
                     ForEach(business.onboardingState.messages) { message in
                         ChatBubble(text: message.text, isUser: message.role == "customer")
@@ -1327,14 +1335,22 @@ struct BusinessChat: View {
                 Task { await model.disconnectCustomerInstagram(businessId) }
             }
             if let analysis = model.customerAnalysis, analysis.inferred != nil {
-                DisclosureGroup(isExpanded: $overviewOpen) {
-                    learnedDetails(analysis)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { overviewOpen.toggle() }
                 } label: {
-                    Text(Copy.text("Business overview", "نظرة عامة", language: model.language))
-                        .font(AppFont.section)
-                        .foregroundStyle(AppColor.foreground)
+                    HStack {
+                        Text(Copy.text("Business overview", "نظرة عامة", language: model.language))
+                            .font(AppFont.section)
+                            .foregroundStyle(AppColor.foreground)
+                        Spacer()
+                        Image(systemName: overviewOpen ? "chevron.up" : "chevron.down")
+                            .foregroundStyle(AppColor.primary)
+                    }
                 }
-                .tint(AppColor.primary)
+                .buttonStyle(.plain)
+                if overviewOpen {
+                    learnedDetails(analysis)
+                }
             }
         }
         .padding(AppSpacing.md)
