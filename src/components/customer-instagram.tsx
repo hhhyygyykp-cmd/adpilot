@@ -52,6 +52,7 @@ export function CustomerInstagramPanel({ businessId }: { businessId: string }) {
   const [inferred, setInferred] = useState<Inferred | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const [overviewOpen, setOverviewOpen] = useState(false);
 
   const load = useCallback(async () => {
     const data = await api<{ instagram: InstagramPublic; analysis: AnalysisPublic }>(
@@ -98,6 +99,7 @@ export function CustomerInstagramPanel({ businessId }: { businessId: string }) {
       setInstagram(data.instagram);
       setAnalysis(data.analysis);
       setInferred(data.analysis.inferred);
+      if (action === "confirm") setOverviewOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
@@ -150,6 +152,19 @@ export function CustomerInstagramPanel({ businessId }: { businessId: string }) {
       </div>
       {analysis?.inferred && inferred ? (
         <div className="mt-8 space-y-4">
+          {analysis.status === "confirmed" ? (
+            <button
+              type="button"
+              onClick={() => setOverviewOpen((open) => !open)}
+              className="flex w-full items-center justify-between text-left"
+              aria-expanded={overviewOpen}
+            >
+              <span className="serif text-2xl">{t("business.instagram.overview")}</span>
+              <span aria-hidden="true">{overviewOpen ? "▴" : "▾"}</span>
+            </button>
+          ) : null}
+          {analysis.status !== "confirmed" || overviewOpen ? (
+            <>
           <h3 className="serif text-2xl">{t("business.instagram.learned")}</h3>
           <p className="text-xs text-[var(--gold)]">{t("business.instagram.inferred")}</p>
           {inferred.preliminary ? (
@@ -191,6 +206,8 @@ export function CustomerInstagramPanel({ businessId }: { businessId: string }) {
           >
             {t("business.instagram.confirm")}
           </button>
+            </>
+          ) : null}
         </div>
       ) : null}
     </section>
