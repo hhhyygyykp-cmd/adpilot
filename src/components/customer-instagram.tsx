@@ -152,18 +152,16 @@ export function CustomerInstagramPanel({ businessId }: { businessId: string }) {
       </div>
       {analysis?.inferred && inferred ? (
         <div className="mt-8 space-y-4">
-          {analysis.status === "confirmed" ? (
-            <button
-              type="button"
-              onClick={() => setOverviewOpen((open) => !open)}
-              className="flex w-full items-center justify-between text-left"
-              aria-expanded={overviewOpen}
-            >
-              <span className="serif text-2xl">{t("business.instagram.overview")}</span>
-              <span aria-hidden="true">{overviewOpen ? "▴" : "▾"}</span>
-            </button>
-          ) : null}
-          {analysis.status !== "confirmed" || overviewOpen ? (
+          <button
+            type="button"
+            onClick={() => setOverviewOpen((open) => !open)}
+            className="flex w-full items-center justify-between text-left"
+            aria-expanded={overviewOpen}
+          >
+            <span className="serif text-2xl">{t("business.instagram.overview")}</span>
+            <span aria-hidden="true">{overviewOpen ? "▴" : "▾"}</span>
+          </button>
+          {overviewOpen ? (
             <>
           <h3 className="serif text-2xl">{t("business.instagram.learned")}</h3>
           <p className="text-xs text-[var(--gold)]">{t("business.instagram.inferred")}</p>
