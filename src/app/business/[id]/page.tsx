@@ -162,6 +162,19 @@ export default function BusinessDetailPage() {
         </form>
         ) : null}
         </div>
+        <div className="mt-6">
+          <ChatThread
+            messages={business.onboardingState.messages}
+            onSend={async (text) => {
+              const data = await api<{ business: Business }>(
+                `/api/businesses/${id}/conversation`,
+                { method: "POST", body: JSON.stringify({ text }) },
+              );
+              setBusiness(data.business);
+              setOverviewOpen(true);
+            }}
+          />
+        </div>
       )}
 
       <Suspense fallback={null}>
