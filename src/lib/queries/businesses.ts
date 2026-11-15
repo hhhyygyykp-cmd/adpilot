@@ -2,6 +2,7 @@ import "server-only";
 
 import { newId } from "../crypto";
 import { parseJson, sql } from "../db";
+import { rateLimit } from "../rate-limit";
 import type {
   BrandColors,
   Business,
@@ -234,6 +235,128 @@ function applyBusinessAnswer(business: Business, fieldKey: string, text: string)
   return next;
 }
 
+const EDITABLE_FIELDS = [
+  "name",
+  "category",
+  "productsServices",
+  "description",
+  "targetCustomers",
+  "location",
+  "website",
+  "publicContact",
+  "brandPersonality",
+  "marketingGoals",
+] as const;
+
+async function askBusinessAgent(input: {
+  text: string;
+  business: Business;
+  language: Language;
+}): Promise<{ reply: string; updates: Record<string, string> } | null> {
+  const key = process.env.OPENAI_API_KEY?.trim();
+  if (!key) return null;
+  const limited = await rateLimit(`openai:${input.business.customerId || "shared"}`, 40, 60 * 60 * 1000);
+  if (!limited.ok) return null;
+  const profile = {
+    name: input.business.name,
+    category: input.business.category,
+    productsServices: input.business.productsServices,
+    description: input.business.description,
+    targetCustomers: input.business.targetCustomers,
+    location: input.business.location,
+    website: input.business.website,
+    publicContact: input.business.publicContact,
+    brandPersonality: input.business.brandPersonality,
+    marketingGoals: input.business.marketingGoals,
+  };
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${key}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini",
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are AdPilot, talking with a customer about their own business. Update only facts they stated. Do not invent prices, offers, or details. Reply in the customer's language, in one or two short sentences. Return JSON {\"reply\":\"...\",\"updates\":{}} . updates may include only name, category, productsServices, description, targetCustomers, location, website, publicContact, brandPersonality, marketingGoals. Omit a key you are not changing.",
+        },
+        {
+          role: "user",
+          content: `Language: ${input.language}\nCurrent profile:\n${JSON.stringify(profile)}\nCustomer:\n${input.text}`,
+        },
+      ],
+    }),
+  });
+  if (!response.ok) return null;
+  const body = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = body.choices?.[0]?.message?.content;
+  if (!content) return null;
+  try {
+    const parsed = JSON.parse(content) as { reply?: unknown; updates?: unknown };
+    const updates: Record<string, string> = {};
+    if (parsed.updates && typeof parsed.updates === "object") {
+      for (const key of EDITABLE_FIELDS) {
+        const value = (parsed.updates as Record<string, unknown>)[key];
+        if (typeof value === "string" && value.trim()) updates[key] = value.trim().slice(0, 2000);
+      }
+    }
+    const reply = typeof parsed.reply === "string" ? parsed.reply.trim().slice(0, 500) : "";
+    if (!reply) return null;
+    return { reply, updates };
+  } catch {
+    return null;
+  }
+}
+
+async function replyAsBusinessAgent(input: {
+  business: Business;
+  messages: ChatMessage[];
+  text: string;
+  language: Language;
+  fallbackField?: string;
+}): Promise<Business> {
+  const messages = [...input.messages, message("customer", input.text)];
+  let next = { ...input.business };
+  const agent = await askBusinessAgent({
+    text: input.text,
+    business: next,
+    language: input.language,
+  });
+  let reply = "";
+  if (agent) {
+    for (const [key, value] of Object.entries(agent.updates)) {
+      next = applyBusinessAnswer(next, key, value);
+    }
+    reply = agent.reply;
+  } else {
+    const edit = parseBusinessEdit(input.text);
+    if (edit) {
+      next = applyBusinessAnswer(next, edit.key, edit.value);
+      reply = businessEditReply({ key: edit.key, value: edit.value, language: input.language });
+    } else if (input.fallbackField && input.fallbackField !== "name") {
+      next = applyBusinessAnswer(next, input.fallbackField, input.text);
+      reply = businessEditReply({
+        key: input.fallbackField,
+        value: input.text,
+        language: input.language,
+      });
+    } else {
+      reply = businessEditReply({ key: null, value: "", language: input.language });
+    }
+  }
+  messages.push(message("agent", reply));
+  next.onboardingComplete = true;
+  next.onboardingState = { messages, awaiting: null };
+  return persistBusiness(next, true);
+}
+
 function senseForTurn(name: string, fieldKey: string, answer: string, skipped: boolean): BusinessSense | null {
   if (fieldKey === "name" || skipped || (fieldKey === "category" && isAffirmation(answer))) {
     return senseBusiness(name);
@@ -362,26 +485,24 @@ export async function continueBusinessOnboarding(input: {
     return persistBusiness(next, true);
   }
 
+  const spoken = input.text.trim();
+  const readyToTalk =
+    Boolean(next.name.trim()) &&
+    awaiting !== "name" &&
+    !input.skip &&
+    !input.skipRemaining &&
+    Boolean(spoken);
+  if (readyToTalk) {
+    return replyAsBusinessAgent({
+      business: next,
+      messages,
+      text: spoken,
+      language: input.language,
+      fallbackField: field?.key,
+    });
+  }
+
   if (!field) {
-    const text = input.text.trim();
-    if (input.business.onboardingComplete && text && !input.skip) {
-      const edit = parseBusinessEdit(text);
-      messages.push(message("customer", text));
-      if (edit) next = applyBusinessAnswer(next, edit.key, edit.value);
-      messages.push(
-        message(
-          "agent",
-          businessEditReply({
-            key: edit?.key ?? null,
-            value: edit?.value ?? "",
-            language: input.language,
-          }),
-        ),
-      );
-      next.onboardingComplete = true;
-      next.onboardingState = { messages, awaiting: null };
-      return persistBusiness(next, true);
-    }
     next.onboardingComplete = true;
     next.onboardingState = { messages, awaiting: null };
     return persistBusiness(next, true);
@@ -405,6 +526,20 @@ export async function continueBusinessOnboarding(input: {
 
   if (!input.skip && !isSkip(userText)) {
     next = applyBusinessAnswer(next, field.key, userText);
+  }
+
+  if (field.key === "name" && next.name.trim()) {
+    messages.push(
+      message(
+        "agent",
+        input.language === "ar"
+          ? `سأحفظ ${next.name}. حدّثني عن العمل بكلامك، أو قل ماذا أغيّر. مثال: المنتجات هي هوديز، أو الموقع إلى دبي مارينا.`
+          : `I'll remember ${next.name}. Tell me about the business in your own words, or say what to change. For example: products are hoodies, or location to Dubai Marina.`,
+      ),
+    );
+    next.onboardingComplete = true;
+    next.onboardingState = { messages, awaiting: null };
+    return persistBusiness(next, true);
   }
 
   if (field.key === "category" && isAffirmation(userText)) {
